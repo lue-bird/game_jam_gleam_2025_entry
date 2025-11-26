@@ -1,6 +1,7 @@
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/string
 import gleam_community/colour
@@ -9,10 +10,11 @@ import lustre
 import lustre/attribute
 import lustre/effect
 import lustre/element as lustre_element
-import lustre/element/html
 import lustre/element/svg
+import lustre/event as lustre_event
 import plinth/browser/document
 import plinth/browser/element
+import plinth/browser/event
 import plinth/browser/window
 import plinth/javascript/global
 
@@ -29,15 +31,37 @@ pub fn main() {
 }
 
 type State {
-  State(window_width: Float, window_height: Float, lucy_angle: Float)
+  State(
+    window_width: Float,
+    window_height: Float,
+    held_down_left: Bool,
+    held_down_right: Bool,
+    lucy_angle: Float,
+    lucy_x: Float,
+    lucy_y: Float,
+    lucy_x_per_second: Float,
+    lucy_y_per_second: Float,
+    lucy_y_maximum: Float,
+    lucy_y_highscore: Float,
+  )
 }
+
+const initial_lucy_y_per_second: Float = 2.3
 
 fn init() -> #(State, effect.Effect(Msg)) {
   #(
     State(
       window_height: window.inner_height(window.self()) |> int.to_float,
       window_width: window.inner_width(window.self()) |> int.to_float,
+      held_down_left: False,
+      held_down_right: False,
       lucy_angle: 0.0,
+      lucy_x_per_second: 0.0,
+      lucy_y_per_second: initial_lucy_y_per_second,
+      lucy_x: 0.0,
+      lucy_y: 0.0,
+      lucy_y_maximum: 0.0,
+      lucy_y_highscore: 0.0,
     ),
     effect.batch([
       effect.from(fn(dispatch) {
@@ -48,6 +72,16 @@ fn init() -> #(State, effect.Effect(Msg)) {
           global.set_interval(1000 / 60, fn() { dispatch(SimulationTickPassed) })
         Nil
       }),
+      effect.from(fn(dispatch) {
+        window.add_event_listener("keydown", fn(e) {
+          dispatch(KeyPressed(event.key(e)))
+        })
+      }),
+      effect.from(fn(dispatch) {
+        window.add_event_listener("keyup", fn(e) {
+          dispatch(KeyReleased(event.key(e)))
+        })
+      }),
     ]),
   )
 }
@@ -55,6 +89,8 @@ fn init() -> #(State, effect.Effect(Msg)) {
 type Msg {
   Resized
   SimulationTickPassed
+  KeyPressed(String)
+  KeyReleased(String)
 }
 
 fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
@@ -67,10 +103,106 @@ fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       ),
       effect.none(),
     )
-    SimulationTickPassed -> #(
-      State(..state, lucy_angle: state.lucy_angle +. 0.02),
-      effect.none(),
-    )
+    KeyPressed(key) -> {
+      case key_as_x_direction(key) {
+        option.None -> #(state, effect.none())
+        option.Some(Left) -> #(
+          State(..state, held_down_left: True),
+          effect.none(),
+        )
+        option.Some(Right) -> #(
+          State(..state, held_down_right: True),
+          effect.none(),
+        )
+      }
+    }
+    KeyReleased(key) -> {
+      case key_as_x_direction(key) {
+        option.None -> #(state, effect.none())
+        option.Some(Left) -> #(
+          State(..state, held_down_left: False),
+          effect.none(),
+        )
+        option.Some(Right) -> #(
+          State(..state, held_down_right: False),
+          effect.none(),
+        )
+      }
+    }
+    SimulationTickPassed -> {
+      let effective_held_x_direction = case
+        state.held_down_left,
+        state.held_down_right
+      {
+        True, False -> -1.0
+        False, True -> 1.0
+        True, True | False, False -> 0.0
+      }
+      let seconds_passed = 1.0 /. { 1000 / 60 |> int.to_float }
+      let new_lucy_y_per_second =
+        state.lucy_y_per_second -. { 1.0 *. seconds_passed } |> float.max(-2.2)
+      let new_lucy_x_per_second =
+        state.lucy_x_per_second
+        *. { 1.0 -. { 0.2 *. seconds_passed } }
+        +. {
+          effective_held_x_direction
+          *. {
+            4.4
+            -. float.absolute_value(
+              state.lucy_x_per_second +. effective_held_x_direction *. 2.2,
+            )
+          }
+          *. 3.0
+          *. seconds_passed
+        }
+
+      let new_lucy_y =
+        state.lucy_y +. { new_lucy_y_per_second *. seconds_passed }
+      case new_lucy_y <. -10.0 {
+        True -> #(
+          State(
+            window_width: state.window_width,
+            window_height: state.window_height,
+            held_down_left: state.held_down_left,
+            held_down_right: state.held_down_right,
+            lucy_angle: 0.0,
+            lucy_y_per_second: initial_lucy_y_per_second,
+            lucy_y: 0.0,
+            lucy_x_per_second: 0.0,
+            lucy_x: 0.0,
+            lucy_y_maximum: 0.0,
+            lucy_y_highscore: state.lucy_y_maximum,
+          ),
+          effect.none(),
+        )
+        False -> #(
+          State(
+            ..state,
+            lucy_angle: state.lucy_angle +. { 1.0 *. seconds_passed },
+            lucy_y_per_second: new_lucy_y_per_second,
+            lucy_y: new_lucy_y,
+            lucy_x_per_second: new_lucy_x_per_second,
+            lucy_x: state.lucy_x +. { new_lucy_x_per_second *. seconds_passed },
+          ),
+          effect.none(),
+        )
+      }
+    }
+  }
+}
+
+type XDirection {
+  Left
+  Right
+}
+
+fn key_as_x_direction(key: String) -> option.Option(XDirection) {
+  case key {
+    "ArrowLeft" -> option.Some(Left)
+    "ArrowRight" -> option.Some(Right)
+    "a" -> option.Some(Left)
+    "d" -> option.Some(Right)
+    _ -> option.None
   }
 }
 
@@ -87,93 +219,104 @@ fn view(state: State) -> lustre_element.Element(Msg) {
       // might be disproportional in width
       #(state.window_height *. ration_width_to_height, state.window_height)
   }
-  html.div([attribute.style("background", "black")], [
-    svg.svg(
-      [
-        attribute.style("position", "absolute"),
-        attribute.style(
-          "right",
-          { { state.window_width -. svg_width } /. 2.0 } |> float.to_string
-            <> "px",
-        ),
-        attribute.style(
-          "bottom",
-          { { state.window_height -. svg_height } /. 2.0 } |> float.to_string
-            <> "px",
-        ),
-        attribute.width(svg_width |> float.truncate),
-        attribute.height(svg_height |> float.truncate),
-      ],
-      [
-        svg.g(
+
+  svg.svg(
+    [
+      attribute.style("position", "absolute"),
+      attribute.style(
+        "right",
+        { { state.window_width -. svg_width } /. 2.0 } |> float.to_string
+          <> "px",
+      ),
+      attribute.style(
+        "bottom",
+        { { state.window_height -. svg_height } /. 2.0 } |> float.to_string
+          <> "px",
+      ),
+      attribute.width(svg_width |> float.truncate),
+      attribute.height(svg_height |> float.truncate),
+    ],
+    [
+      svg.g([], [
+        svg.rect([
+          attribute.attribute("x", "0"),
+          attribute.attribute("y", "-100%"),
+          attribute.attribute("width", "100%"),
+          attribute.attribute("height", "100%"),
+          attribute.attribute(
+            "fill",
+            colour.from_rgb(0.0, 0.3, 0.46)
+              |> result.unwrap(colour.black)
+              |> colour.to_css_rgba_string,
+          ),
+        ]),
+        svg.text(
           [
-            attribute.attribute(
-              "transform",
-              "scale("
-                <> { svg_width /. 16.0 |> float.to_string }
-                <> ", "
-                <> { svg_height /. 9.0 |> float.to_string }
-                <> ")",
+            attribute.attribute("x", "7"),
+            attribute.attribute("y", "8.5"),
+            attribute.attribute("pointer-events", "none"),
+            attribute.style("font-weight", "bold"),
+            attribute.style("font-size", "1px"),
+            attribute.style(
+              "fill",
+              colour.from_rgb(0.9, 1.0, 0.86)
+                |> result.unwrap(colour.black)
+                |> colour.to_css_rgba_string,
             ),
           ],
-          [
-            svg.rect([
-              attribute.attribute("x", "0"),
-              attribute.attribute("y", "0"),
-              attribute.attribute("width", "100%"),
-              attribute.attribute("height", "100%"),
-              attribute.attribute(
-                "fill",
-                colour.from_rgb(0.0, 0.3, 0.46)
-                  |> result.unwrap(colour.black)
-                  |> colour.to_css_rgba_string,
-              ),
-            ]),
-            svg_lucy()
-              |> svg_rotate(state.lucy_angle)
-              |> svg_translate(11.86, 3.9),
-            svg_lucy()
-              |> svg_rotate(state.lucy_angle)
-              |> svg_translate(4.5, 4.3),
-            svg.text(
-              [
-                attribute.attribute("x", "2"),
-                attribute.attribute("y", "6"),
-                attribute.attribute("pointer-events", "none"),
-                attribute.style("font-weight", "bold"),
-                attribute.style("font-size", "3px"),
-                attribute.style(
-                  "fill",
-                  colour.from_rgb(0.9, 1.0, 0.86)
-                    |> result.unwrap(colour.black)
-                    |> colour.to_css_rgba_string,
-                ),
-              ],
-              "hi, cutie",
-            ),
-          ],
-        ),
-      ],
-    ),
-  ])
+          state.lucy_y |> float.truncate |> int.to_string <> "m",
+        )
+          |> svg_scale(1.0, -1.0),
+        svg_lucy()
+          |> svg_scale(0.5, 0.5)
+          |> svg_rotate(state.lucy_angle)
+          |> svg_translate(8.0 +. state.lucy_x, -7.0 +. state.lucy_y),
+      ])
+      |> svg_scale(svg_width /. 16.0, float.negate(svg_height /. 9.0)),
+    ],
+  )
 }
 
 fn svg_lucy() -> lustre_element.Element(msg) {
-  svg.path([
-    attribute.attribute("stroke-width", "0.23"),
-    attribute.attribute("stroke-linejoin", "round"),
-    attribute.attribute(
-      "stroke",
-      lucy_color()
-        |> colour.to_css_rgba_string,
-    ),
-    attribute.attribute(
-      "fill",
-      lucy_color()
-        |> colour.to_css_rgba_string,
-    ),
-    attribute.attribute("d", lucy_path()),
-    attribute.attribute("pointer-events", "none"),
+  svg.g([], [
+    svg.path([
+      attribute.attribute("stroke-width", "0.23"),
+      attribute.attribute("stroke-linejoin", "round"),
+      attribute.attribute(
+        "stroke",
+        lucy_color()
+          |> colour.to_css_rgba_string,
+      ),
+      attribute.attribute(
+        "fill",
+        lucy_color()
+          |> colour.to_css_rgba_string,
+      ),
+      attribute.attribute("d", lucy_path()),
+    ]),
+    svg.circle([
+      attribute.attribute("cy", "0.12"),
+      attribute.attribute("cx", "-0.2"),
+      attribute.attribute("r", "0.1"),
+      attribute.attribute("fill", "black"),
+    ]),
+    svg.circle([
+      attribute.attribute("cy", "0.12"),
+      attribute.attribute("cx", "0.2"),
+      attribute.attribute("r", "0.1"),
+      attribute.attribute("fill", "black"),
+    ]),
+    svg.circle([
+      attribute.attribute("cy", "-0.1"),
+      attribute.attribute("cx", "0"),
+      attribute.attribute("r", "0.12"),
+      attribute.attribute("fill", "none"),
+      attribute.attribute("stroke", "black"),
+      attribute.attribute("stroke-width", "0.08"),
+      attribute.attribute("pathLength", "360"),
+      attribute.attribute("stroke-dasharray", "0 180 180"),
+      attribute.attribute("stroke-linecap", "round"),
+    ]),
   ])
 }
 
@@ -200,6 +343,26 @@ fn lucy_path() -> String {
 fn lucy_color() {
   colour.from_rgb(1.0, 0.5, 1.0)
   |> result.unwrap(colour.black)
+}
+
+fn svg_scale(
+  svg: lustre_element.Element(msg),
+  x: Float,
+  y: Float,
+) -> lustre_element.Element(msg) {
+  svg.g(
+    [
+      attribute.attribute(
+        "transform",
+        "scale("
+          <> { x |> float.to_string }
+          <> ", "
+          <> { y |> float.to_string }
+          <> ")",
+      ),
+    ],
+    [svg],
+  )
 }
 
 fn svg_translate(
