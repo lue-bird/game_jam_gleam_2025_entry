@@ -1,4 +1,3 @@
-import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/list
@@ -9,10 +8,9 @@ import gleam_community/maths
 import lustre
 import lustre/attribute
 import lustre/effect
-import lustre/element.{type Element} as lustre_element
+import lustre/element as lustre_element
 import lustre/element/html
 import lustre/element/svg
-import lustre/event
 import plinth/browser/document
 import plinth/browser/element
 import plinth/browser/window
@@ -21,7 +19,11 @@ import plinth/javascript/global
 pub fn main() {
   let app = lustre.application(fn(_: Nil) { init() }, update, view)
   // I couldn't get "using custom index.html with lustre/dev start" to work
-  element.set_attribute(document.body(), "style", "margin: 0")
+  element.set_attribute(
+    document.body(),
+    "style",
+    "margin: 0; background: black",
+  )
   let assert Ok(_) = lustre.start(app, "#app", Nil)
   Nil
 }
@@ -72,7 +74,7 @@ fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
   }
 }
 
-fn view(state: State) -> Element(Msg) {
+fn view(state: State) -> lustre_element.Element(Msg) {
   let ration_width_to_height: Float = 16.0 /. 9.0
   let #(svg_width, svg_height) = case
     state.window_width <. state.window_height *. ration_width_to_height
@@ -85,76 +87,78 @@ fn view(state: State) -> Element(Msg) {
       // might be disproportional in width
       #(state.window_height *. ration_width_to_height, state.window_height)
   }
-  svg.svg(
-    [
-      attribute.style("position", "absolute"),
-      attribute.style(
-        "right",
-        { { state.window_width -. svg_width } /. 2.0 } |> float.to_string
-          <> "px",
-      ),
-      attribute.style(
-        "bottom",
-        { { state.window_height -. svg_height } /. 2.0 } |> float.to_string
-          <> "px",
-      ),
-      attribute.width(svg_width |> float.truncate),
-      attribute.height(svg_height |> float.truncate),
-    ],
-    [
-      svg.g(
-        [
-          attribute.attribute(
-            "transform",
-            "scale("
-              <> { svg_width /. 16.0 |> float.to_string }
-              <> ", "
-              <> { svg_height /. 9.0 |> float.to_string }
-              <> ")",
-          ),
-        ],
-        [
-          svg.rect([
-            attribute.attribute("x", "0"),
-            attribute.attribute("y", "0"),
-            attribute.attribute("width", "100%"),
-            attribute.attribute("height", "100%"),
+  html.div([attribute.style("background", "black")], [
+    svg.svg(
+      [
+        attribute.style("position", "absolute"),
+        attribute.style(
+          "right",
+          { { state.window_width -. svg_width } /. 2.0 } |> float.to_string
+            <> "px",
+        ),
+        attribute.style(
+          "bottom",
+          { { state.window_height -. svg_height } /. 2.0 } |> float.to_string
+            <> "px",
+        ),
+        attribute.width(svg_width |> float.truncate),
+        attribute.height(svg_height |> float.truncate),
+      ],
+      [
+        svg.g(
+          [
             attribute.attribute(
-              "fill",
-              colour.from_rgb(0.0, 0.3, 0.46)
-                |> result.unwrap(colour.black)
-                |> colour.to_css_rgba_string,
+              "transform",
+              "scale("
+                <> { svg_width /. 16.0 |> float.to_string }
+                <> ", "
+                <> { svg_height /. 9.0 |> float.to_string }
+                <> ")",
             ),
-          ]),
-          svg_lucy()
-            |> svg_rotate(state.lucy_angle)
-            |> svg_translate(11.86, 3.9),
-          svg_lucy()
-            |> svg_rotate(state.lucy_angle)
-            |> svg_translate(4.5, 4.3),
-          svg.text(
-            [
-              attribute.attribute("x", "2"),
-              attribute.attribute("y", "6"),
-              attribute.attribute("pointer-events", "none"),
-              attribute.style("font-weight", "bold"),
-              attribute.style("font-size", "3px"),
-              attribute.style(
+          ],
+          [
+            svg.rect([
+              attribute.attribute("x", "0"),
+              attribute.attribute("y", "0"),
+              attribute.attribute("width", "100%"),
+              attribute.attribute("height", "100%"),
+              attribute.attribute(
                 "fill",
-                colour.from_rgb(0.9, 1.0, 0.86)
+                colour.from_rgb(0.0, 0.3, 0.46)
                   |> result.unwrap(colour.black)
                   |> colour.to_css_rgba_string,
               ),
-            ],
-            "hi, cutie",
-          ),
-        ],
-      ),
-    ],
-  )
+            ]),
+            svg_lucy()
+              |> svg_rotate(state.lucy_angle)
+              |> svg_translate(11.86, 3.9),
+            svg_lucy()
+              |> svg_rotate(state.lucy_angle)
+              |> svg_translate(4.5, 4.3),
+            svg.text(
+              [
+                attribute.attribute("x", "2"),
+                attribute.attribute("y", "6"),
+                attribute.attribute("pointer-events", "none"),
+                attribute.style("font-weight", "bold"),
+                attribute.style("font-size", "3px"),
+                attribute.style(
+                  "fill",
+                  colour.from_rgb(0.9, 1.0, 0.86)
+                    |> result.unwrap(colour.black)
+                    |> colour.to_css_rgba_string,
+                ),
+              ],
+              "hi, cutie",
+            ),
+          ],
+        ),
+      ],
+    ),
+  ])
 }
 
-fn svg_lucy() -> Element(msg) {
+fn svg_lucy() -> lustre_element.Element(msg) {
   svg.path([
     attribute.attribute("stroke-width", "0.23"),
     attribute.attribute("stroke-linejoin", "round"),
@@ -198,7 +202,11 @@ fn lucy_color() {
   |> result.unwrap(colour.black)
 }
 
-fn svg_translate(svg: Element(msg), x: Float, y: Float) -> Element(msg) {
+fn svg_translate(
+  svg: lustre_element.Element(msg),
+  x: Float,
+  y: Float,
+) -> lustre_element.Element(msg) {
   svg.g(
     [
       attribute.attribute(
@@ -214,7 +222,10 @@ fn svg_translate(svg: Element(msg), x: Float, y: Float) -> Element(msg) {
   )
 }
 
-fn svg_rotate(svg: Element(msg), angle: Float) -> Element(msg) {
+fn svg_rotate(
+  svg: lustre_element.Element(msg),
+  angle: Float,
+) -> lustre_element.Element(msg) {
   svg.g(
     [
       attribute.attribute(
