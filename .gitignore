@@ -1,0 +1,9 @@
+*.beam
+*.ez
+/build
+erl_crash.dump
+manifest.toml
+
+#Added automatically by Lustre Dev Tools
+/.lustre
+/dist
