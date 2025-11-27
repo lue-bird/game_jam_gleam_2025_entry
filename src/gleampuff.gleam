@@ -158,8 +158,20 @@ fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
         }
       let new_lucy_y =
         state.lucy_y +. { new_lucy_y_per_second *. seconds_passed }
-      let new_lucy_x =
+      let new_lucy_x_not_wrapped =
         state.lucy_x +. { new_lucy_x_per_second *. seconds_passed }
+      let new_lucy_x = case
+        new_lucy_x_not_wrapped
+        <. float.negate(screen_width /. 2.0 +. lucy_radius)
+      {
+        True -> new_lucy_x_not_wrapped +. { screen_width +. lucy_radius *. 2.0 }
+        False ->
+          case new_lucy_x_not_wrapped >. screen_width /. 2.0 +. lucy_radius {
+            True ->
+              new_lucy_x_not_wrapped -. { screen_width +. lucy_radius *. 2.0 }
+            False -> new_lucy_x_not_wrapped
+          }
+      }
       let lucy_falls_on_cloud: Bool =
         new_lucy_y_per_second <. 0.0
         && cloud_positions
@@ -174,7 +186,7 @@ fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
             <=. { cloud_width /. 2.0 }
           }
         })
-      case new_lucy_y <. -10.0 {
+      case new_lucy_y <. float.negate(screen_height *. 0.9) {
         True -> #(
           State(
             window_width: state.window_width,
@@ -234,8 +246,12 @@ fn key_as_x_direction(key: String) -> option.Option(XDirection) {
   }
 }
 
+const screen_width = 16.0
+
+const screen_height = 9.0
+
 fn view(state: State) -> lustre_element.Element(Event) {
-  let ration_width_to_height: Float = 16.0 /. 9.0
+  let ration_width_to_height: Float = screen_width /. screen_height
   let #(svg_width, svg_height) = case
     state.window_width <. state.window_height *. ration_width_to_height
   {
@@ -247,6 +263,11 @@ fn view(state: State) -> lustre_element.Element(Event) {
       // might be disproportional in width
       #(state.window_height *. ration_width_to_height, state.window_height)
   }
+  let progress: Float =
+    state.lucy_y *. { 1.0 /. 20.0 }
+    // TODO set to final height (200 or something) 
+    |> float.max(0.0)
+    |> float.min(1.0)
 
   svg.svg(
     [
@@ -273,15 +294,21 @@ fn view(state: State) -> lustre_element.Element(Event) {
           attribute.attribute("height", "100%"),
           attribute.attribute(
             "fill",
-            colour.from_rgb(0.0, 0.3, 0.46)
+            colour.from_rgb(
+              state.lucy_y *. { -1.0 /. screen_height }
+                |> float.max(0.0)
+                |> float.min(0.7),
+              0.45 -. { progress *. 0.45 },
+              0.6 -. { progress *. 0.4 },
+            )
               |> result.unwrap(colour.black)
               |> colour.to_css_rgba_string,
           ),
         ]),
         svg.text(
           [
-            attribute.attribute("x", "8"),
-            attribute.attribute("y", "8.6"),
+            attribute.attribute("x", screen_width /. 2.0 |> float.to_string),
+            attribute.attribute("y", screen_height *. 0.95 |> float.to_string),
             attribute.attribute("pointer-events", "none"),
             attribute.style("text-anchor", "middle"),
             attribute.style("font-weight", "bold"),
@@ -315,9 +342,16 @@ fn view(state: State) -> lustre_element.Element(Event) {
               }),
           ),
         ])
-          |> svg_translate(8.0, -5.0 -. state.lucy_y),
+          |> svg_translate(
+            screen_width /. 2.0,
+            float.negate(screen_height *. 0.56)
+              -. { state.lucy_y |> float.max(0.0) },
+          ),
       ])
-      |> svg_scale(svg_width /. 16.0, float.negate(svg_height /. 9.0)),
+      |> svg_scale(
+        svg_width /. screen_width,
+        float.negate(svg_height /. screen_height),
+      ),
     ],
   )
 }
@@ -364,6 +398,9 @@ fn svg_lucy() -> lustre_element.Element(event) {
     ]),
   ])
 }
+
+/// TODO make svg_lucy etc depend on it
+const lucy_radius = 0.5
 
 fn lucy_path() -> String {
   "M 0,0\n"
@@ -495,14 +532,10 @@ fn star_shape_points() -> List(#(Point, Point)) {
   list.range(0, 5)
   |> list.map(fn(i) {
     let angle = angle_step *. { i |> int.to_float }
-    #(
-      #(maths.cos(angle), maths.sin(angle)) |> point_scale_by(0.268),
-      #(
-        maths.cos(angle +. { angle_step /. 2.0 }),
-        maths.sin(angle +. { angle_step /. 2.0 }),
-      )
-        |> point_scale_by(1.0),
-    )
+    #(#(maths.cos(angle), maths.sin(angle)) |> point_scale_by(0.268), #(
+      maths.cos(angle +. { angle_step /. 2.0 }),
+      maths.sin(angle +. { angle_step /. 2.0 }),
+    ))
   })
 }
 
