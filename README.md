@@ -15,7 +15,7 @@ gleam run -m lustre/dev start
 - add start menu
 - optional: add music
 - optional: add sound for every 50m
-- optional: add win condition like reaching a giant diamond
+- optional: add win condition like reaching the moon
 - optional: add fail more conditions, e.g. falling more than 20m
 - optional: add power ups like a launchpad
 - optional: add movement abilities like grapple

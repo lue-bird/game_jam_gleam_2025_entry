@@ -343,6 +343,15 @@ fn view(state: State) -> lustre_element.Element(Event) {
                 svg_cloud() |> svg_translate(x, y)
               }),
           ),
+          svg.g(
+            [],
+            star_positions()
+              |> list.map(fn(star_position) {
+                let #(x, y) = star_position
+                svg_small_star()
+                |> svg_translate(x, y)
+              }),
+          ),
         ])
           |> svg_translate(
             screen_width /. 2.0,
@@ -358,11 +367,43 @@ fn view(state: State) -> lustre_element.Element(Event) {
   )
 }
 
-const star_positions: List(Point) = [#(-2.0, 40.0), #(2.0, 41.0)]
+fn star_positions() -> List(Point) {
+  list.range(
+    screen_width *. -1.0 |> float.truncate,
+    screen_width |> float.truncate,
+  )
+  |> list.flat_map(fn(x_thirds) {
+    let x = { x_thirds |> int.to_float } *. 0.5
+    let y_start_randomness =
+      12_432_058_259.3248093284923 *. { x_thirds |> int.to_float }
+      |> float.modulo(1.0)
+      |> result.unwrap(0.0)
+    let y_start = goal_y *. 0.3 +. y_start_randomness *. 12.0
+
+    list.range(0, goal_y *. 0.12 |> float.truncate)
+    |> list.map(fn(y_index) {
+      let randomness =
+        12_432_058_259.20756244 *. y_start_randomness
+        |> float.modulo(1.0)
+        |> result.unwrap(0.0)
+      #(
+        x,
+        y_start
+          +. {
+          y_index |> int.to_float |> float.power(0.5) |> result.unwrap(0.0)
+        }
+          *. 15.0
+          +. randomness
+          *. 10.0,
+      )
+    })
+  })
+}
 
 fn svg_small_star() -> lustre_element.Element(_event) {
-  svg.circle([
-    attribute.attribute("r", "0.03"),
+  svg.rect([
+    attribute.attribute("width", "0.01"),
+    attribute.attribute("height", "0.01"),
     attribute.attribute("fill", "white"),
   ])
 }
