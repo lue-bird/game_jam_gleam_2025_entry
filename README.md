@@ -8,7 +8,6 @@ gleam run -m lustre/dev start
 
 ## TODO
 - add more clouds
-- when falling, switch lucy eyes to angle inward
 - add diamonds to collect (should be in difficult to reach places)
 - add left-right screen wrapping
 - add death, diamond collect sound, switch out cloud bounce sound for something fluffy

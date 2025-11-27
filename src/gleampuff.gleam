@@ -20,7 +20,34 @@ import plinth/browser/window
 import plinth/javascript/global
 
 pub fn main() {
-  let app = lustre.application(fn(_: Nil) { init() }, update, view)
+  let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
+  // the whole "to avoid recomputing unchanging svgs, pass them from main"
+  // thing seems super dumb. Is there something better?
+  let stars_svg =
+    svg.g(
+      [],
+      star_positions()
+        |> list.map(fn(star_position) {
+          let #(x, y) = star_position
+          svg_small_star()
+          |> svg_translate(x, y)
+        }),
+    )
+  let clouds_svg =
+    svg.g(
+      [],
+      cloud_positions
+        |> list.map(fn(position) {
+          let #(x, y) = position
+          svg_cloud() |> svg_translate(x, y)
+        }),
+    )
+  let app =
+    lustre.application(
+      fn(_: Nil) { init() },
+      fn(event, state) { update(cloud_bounce_audio, event, state) },
+      fn(state) { view(state, stars_svg, clouds_svg) },
+    )
   // I couldn't get "using custom index.html with lustre/dev start" to work
   element.set_attribute(
     document.body(),
@@ -94,7 +121,11 @@ type Event {
   KeyReleased(String)
 }
 
-fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
+fn update(
+  cloud_bounce_audio: audio.Audio,
+  state: State,
+  event: Event,
+) -> #(State, effect.Effect(Event)) {
   case event {
     Resized -> #(
       State(
@@ -219,8 +250,8 @@ fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
           case lucy_falls_on_cloud {
             True ->
               effect.from(fn(_) {
-                // TODO monotone, variate pitch and adjust volume
-                let _ = audio.play(audio.new("cloud-bounce.mp3"))
+                // monotone, consider variating pitch and adjusting volume
+                let _ = audio.play(cloud_bounce_audio)
                 Nil
               })
             False -> effect.none()
@@ -252,7 +283,11 @@ const screen_height: Float = 9.0
 
 const goal_y: Float = 100.0
 
-fn view(state: State) -> lustre_element.Element(Event) {
+fn view(
+  state: State,
+  stars_svg: lustre_element.Element(_event),
+  clouds_svg: lustre_element.Element(_event),
+) -> lustre_element.Element(Event) {
   let ration_width_to_height: Float = screen_width /. screen_height
   let #(svg_width, svg_height) = case
     state.window_width <. state.window_height *. ration_width_to_height
@@ -331,27 +366,12 @@ fn view(state: State) -> lustre_element.Element(Event) {
         )
           |> svg_scale(1.0, -1.0),
         svg.g([], [
-          svg_lucy()
+          svg_lucy(state.lucy_y_per_second <. -1.0)
             |> svg_scale(0.5, 0.5)
             |> svg_rotate(state.lucy_angle)
             |> svg_translate(state.lucy_x, state.lucy_y),
-          svg.g(
-            [],
-            cloud_positions
-              |> list.map(fn(position) {
-                let #(x, y) = position
-                svg_cloud() |> svg_translate(x, y)
-              }),
-          ),
-          svg.g(
-            [],
-            star_positions()
-              |> list.map(fn(star_position) {
-                let #(x, y) = star_position
-                svg_small_star()
-                |> svg_translate(x, y)
-              }),
-          ),
+          clouds_svg,
+          stars_svg,
         ])
           |> svg_translate(
             screen_width /. 2.0,
@@ -408,7 +428,15 @@ fn svg_small_star() -> lustre_element.Element(_event) {
   ])
 }
 
-fn svg_lucy() -> lustre_element.Element(event) {
+fn svg_lucy(is_falling: Bool) -> lustre_element.Element(event) {
+  let svg_lucy_eye = case is_falling {
+    True -> lucy_closed_eye()
+    False ->
+      svg.circle([
+        attribute.attribute("r", "0.1"),
+        attribute.attribute("fill", "black"),
+      ])
+  }
   svg.g([], [
     svg.path([
       attribute.attribute("stroke-width", "0.23"),
@@ -425,18 +453,11 @@ fn svg_lucy() -> lustre_element.Element(event) {
       ),
       attribute.attribute("d", lucy_path()),
     ]),
-    svg.circle([
-      attribute.attribute("cy", "0.12"),
-      attribute.attribute("cx", "-0.2"),
-      attribute.attribute("r", "0.1"),
-      attribute.attribute("fill", "black"),
-    ]),
-    svg.circle([
-      attribute.attribute("cy", "0.12"),
-      attribute.attribute("cx", "0.2"),
-      attribute.attribute("r", "0.1"),
-      attribute.attribute("fill", "black"),
-    ]),
+    svg_lucy_eye
+      |> svg_translate(-0.2, 0.12),
+    svg_lucy_eye
+      |> svg_rotate(maths.pi())
+      |> svg_translate(0.2, 0.12),
     svg.circle([
       attribute.attribute("cy", "-0.1"),
       attribute.attribute("cx", "0"),
@@ -451,12 +472,24 @@ fn svg_lucy() -> lustre_element.Element(event) {
   ])
 }
 
+fn lucy_closed_eye() -> lustre_element.Element(_event) {
+  svg.polyline([
+    attribute.attribute("points", "-0.07,0.15 0.1,0.0 -0.07,-0.15"),
+    attribute.attribute("fill", "none"),
+    attribute.attribute("stroke", "black"),
+    attribute.attribute("stroke-width", "0.08"),
+    attribute.attribute("stroke-linecap", "round"),
+    attribute.attribute("stroke-linejoin", "round"),
+  ])
+  |> svg_scale(0.7, 0.7)
+}
+
 /// TODO make svg_lucy etc depend on it
 const lucy_radius = 0.5
 
 fn lucy_path() -> String {
   "M 0,0\n"
-  <> star_shape_points()
+  <> lucy_shape_points()
   |> list.map(fn(points) {
     let #(inner, outer) = points
     let #(x, y) = inner
@@ -472,6 +505,18 @@ fn lucy_path() -> String {
   })
   |> string.join("\n")
   <> "\nz"
+}
+
+fn lucy_shape_points() -> List(#(Point, Point)) {
+  let angle_step = 2.0 *. maths.pi() /. 5.0
+  list.range(0, 5)
+  |> list.map(fn(i) {
+    let angle = angle_step *. { i |> int.to_float }
+    #(#(maths.cos(angle), maths.sin(angle)) |> point_scale_by(0.268), #(
+      maths.cos(angle +. { angle_step /. 2.0 }),
+      maths.sin(angle +. { angle_step /. 2.0 }),
+    ))
+  })
 }
 
 fn lucy_color() {
@@ -661,18 +706,6 @@ fn svg_rotate(
 
 type Point =
   #(Float, Float)
-
-fn star_shape_points() -> List(#(Point, Point)) {
-  let angle_step = 2.0 *. maths.pi() /. 5.0
-  list.range(0, 5)
-  |> list.map(fn(i) {
-    let angle = angle_step *. { i |> int.to_float }
-    #(#(maths.cos(angle), maths.sin(angle)) |> point_scale_by(0.268), #(
-      maths.cos(angle +. { angle_step /. 2.0 }),
-      maths.sin(angle +. { angle_step /. 2.0 }),
-    ))
-  })
-}
 
 fn point_scale_by(point: Point, scale: Float) -> Point {
   let #(x, y) = point
