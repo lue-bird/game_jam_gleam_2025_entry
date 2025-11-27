@@ -20,4 +20,4 @@ gleam run -m lustre/dev start
 - optional: add power ups like a launchpad
 - optional: add movement abilities like grapple
 - optional: add animations for most things that have a sound
-- optional: background stars/planets the higher you go. in lower half maybe birds
+- optional: background stars/planets the higher you go. in lower half fog, maybe birds

@@ -246,9 +246,11 @@ fn key_as_x_direction(key: String) -> option.Option(XDirection) {
   }
 }
 
-const screen_width = 16.0
+const screen_width: Float = 16.0
 
-const screen_height = 9.0
+const screen_height: Float = 9.0
+
+const goal_y: Float = 100.0
 
 fn view(state: State) -> lustre_element.Element(Event) {
   let ration_width_to_height: Float = screen_width /. screen_height
@@ -264,7 +266,7 @@ fn view(state: State) -> lustre_element.Element(Event) {
       #(state.window_height *. ration_width_to_height, state.window_height)
   }
   let progress: Float =
-    state.lucy_y *. { 1.0 /. 20.0 }
+    state.lucy_y *. { 1.0 /. goal_y }
     // TODO set to final height (200 or something) 
     |> float.max(0.0)
     |> float.min(1.0)
@@ -298,8 +300,8 @@ fn view(state: State) -> lustre_element.Element(Event) {
               state.lucy_y *. { -1.0 /. screen_height }
                 |> float.max(0.0)
                 |> float.min(0.7),
-              0.45 -. { progress *. 0.45 },
-              0.6 -. { progress *. 0.4 },
+              { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
+              0.6 -. { progress *. 0.56 },
             )
               |> result.unwrap(colour.black)
               |> colour.to_css_rgba_string,
@@ -354,6 +356,15 @@ fn view(state: State) -> lustre_element.Element(Event) {
       ),
     ],
   )
+}
+
+const star_positions: List(Point) = [#(-2.0, 40.0), #(2.0, 41.0)]
+
+fn svg_small_star() -> lustre_element.Element(_event) {
+  svg.circle([
+    attribute.attribute("r", "0.03"),
+    attribute.attribute("fill", "white"),
+  ])
 }
 
 fn svg_lucy() -> lustre_element.Element(event) {
@@ -463,7 +474,85 @@ fn svg_cloud() -> lustre_element.Element(event) {
   |> svg_scale(1.2, 1.2)
 }
 
-const cloud_positions: List(Point) = [#(-1.2, 1.8), #(1.2, 4.0)]
+const cloud_positions: List(Point) = [
+  #(-1.2, 1.8),
+  #(1.2, 4.0),
+  #(-1.5, 5.4),
+  #(1.2, 6.1),
+  #(3.2, 9.1),
+  #(-3.2, 9.1),
+  #(-3.1, 11.3),
+  #(-2.7, 14.0),
+  #(2.5, 15.0),
+  #(0.0, 18.0),
+  #(-0.2, 21.0),
+  #(0.1, 24.0),
+  #(4.1, 23.0),
+  #(4.1, 26.0),
+  #(2.0, 27.0),
+  #(0.0, 28.0),
+  #(-2.0, 29.0),
+  #(-4.0, 30.05),
+  #(-4.0, 30.05),
+  #(-6.0, 32.05),
+  #(-4.1, 33.0),
+  #(-4.1, 36.0),
+  #(-2.0, 37.0),
+  #(0.2, 39.0),
+  #(-0.1, 34.0),
+  #(0.0, 41.0),
+  #(6.0, 44.0),
+  #(-6.0, 47.0),
+  #(2.0, 49.0),
+  #(-6.0, 51.0),
+  #(-5.4, 52.6),
+  #(2.0, 53.0),
+  #(-5.6, 56.9),
+  #(-5.8, 56.5),
+  #(2.0, 59.5),
+  #(0.0, 62.0),
+  #(0.4, 63.6),
+  #(0.7, 64.1),
+  #(-6.0, 66.6),
+  #(4.4, 69.6),
+  #(4.7, 70.1),
+  #(-4.4, 73.6),
+  #(-4.7, 74.1),
+  #(4.4, 77.2),
+  #(-6.7, 78.7),
+  #(4.4, 79.6),
+  #(4.7, 80.1),
+  #(0.1, 81.1),
+  #(0.0, 81.6),
+  #(-0.2, 81.1),
+  #(-1.7, 82.7),
+  #(-0.9, 83.1),
+  #(-3.9, 84.1),
+  #(3.9, 84.1),
+  #(-2.9, 85.1),
+  #(2.9, 85.1),
+  #(-1.9, 86.1),
+  #(1.9, 86.1),
+  #(-0.9, 87.1),
+  #(0.9, 87.1),
+  #(0.0, 90.1),
+  #(0.2, 93.1),
+  #(-3.7, 93.2),
+  #(3.4, 93.2),
+  #(-0.2, 95.7),
+  #(0.7, 95.9),
+  #(-1.2, 96.0),
+  #(-5.1, 96.0),
+  #(4.0, 96.1),
+  #(-0.8, 96.1),
+  #(0.3, 96.1),
+  #(0.4, 96.3),
+  #(-1.1, 96.5),
+  #(-0.6, 96.6),
+  #(0.1, 96.7),
+  #(-1.9, 97.0),
+  #(-0.4, 97.1),
+]
 
 const cloud_width: Float = 2.0
 
