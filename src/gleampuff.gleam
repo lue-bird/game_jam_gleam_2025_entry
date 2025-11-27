@@ -48,7 +48,7 @@ type State {
 
 const initial_lucy_y_per_second: Float = 2.3
 
-fn init() -> #(State, effect.Effect(Msg)) {
+fn init() -> #(State, effect.Effect(Event)) {
   #(
     State(
       window_height: window.inner_height(window.self()) |> int.to_float,
@@ -86,15 +86,15 @@ fn init() -> #(State, effect.Effect(Msg)) {
   )
 }
 
-type Msg {
+type Event {
   Resized
   SimulationTickPassed
   KeyPressed(String)
   KeyReleased(String)
 }
 
-fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
-  case msg {
+fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
+  case event {
     Resized -> #(
       State(
         ..state,
@@ -155,9 +155,24 @@ fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
           *. 3.0
           *. seconds_passed
         }
-
       let new_lucy_y =
         state.lucy_y +. { new_lucy_y_per_second *. seconds_passed }
+      let new_lucy_x =
+        state.lucy_x +. { new_lucy_x_per_second *. seconds_passed }
+      let lucy_falls_on_cloud: Bool =
+        new_lucy_y_per_second <. 0.0
+        && cloud_positions
+        |> list.any(fn(cloud_position) {
+          let #(cloud_x, cloud_y) = cloud_position
+          {
+            float.absolute_value(new_lucy_y -. cloud_y)
+            <=. { cloud_height /. 2.0 }
+          }
+          && {
+            float.absolute_value(new_lucy_x -. cloud_x)
+            <=. { cloud_width /. 2.0 }
+          }
+        })
       case new_lucy_y <. -10.0 {
         True -> #(
           State(
@@ -179,10 +194,14 @@ fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
           State(
             ..state,
             lucy_angle: state.lucy_angle +. { 1.0 *. seconds_passed },
-            lucy_y_per_second: new_lucy_y_per_second,
+            lucy_y_per_second: case lucy_falls_on_cloud {
+              True -> 2.0
+              False -> new_lucy_y_per_second
+            },
             lucy_y: new_lucy_y,
+            // TODO
             lucy_x_per_second: new_lucy_x_per_second,
-            lucy_x: state.lucy_x +. { new_lucy_x_per_second *. seconds_passed },
+            lucy_x: new_lucy_x,
           ),
           effect.none(),
         )
@@ -206,7 +225,7 @@ fn key_as_x_direction(key: String) -> option.Option(XDirection) {
   }
 }
 
-fn view(state: State) -> lustre_element.Element(Msg) {
+fn view(state: State) -> lustre_element.Element(Event) {
   let ration_width_to_height: Float = 16.0 /. 9.0
   let #(svg_width, svg_height) = case
     state.window_width <. state.window_height *. ration_width_to_height
@@ -271,13 +290,21 @@ fn view(state: State) -> lustre_element.Element(Msg) {
           |> svg_scale(0.5, 0.5)
           |> svg_rotate(state.lucy_angle)
           |> svg_translate(8.0 +. state.lucy_x, -7.0 +. state.lucy_y),
+        svg.g(
+          [],
+          cloud_positions
+            |> list.map(fn(position) {
+              let #(x, y) = position
+              svg_cloud() |> svg_translate(8.0 +. x, -7.0 +. y)
+            }),
+        ),
       ])
       |> svg_scale(svg_width /. 16.0, float.negate(svg_height /. 9.0)),
     ],
   )
 }
 
-fn svg_lucy() -> lustre_element.Element(msg) {
+fn svg_lucy() -> lustre_element.Element(event) {
   svg.g([], [
     svg.path([
       attribute.attribute("stroke-width", "0.23"),
@@ -345,11 +372,53 @@ fn lucy_color() {
   |> result.unwrap(colour.black)
 }
 
+fn svg_cloud() -> lustre_element.Element(event) {
+  svg.g(
+    [
+      attribute.style(
+        "fill",
+        colour.from_rgb(0.9, 1.0, 0.86)
+          |> result.unwrap(colour.black)
+          |> colour.to_css_rgba_string,
+      ),
+    ],
+    [
+      svg.circle([
+        attribute.attribute("cy", "0.12"),
+        attribute.attribute("cx", "-0.27"),
+        attribute.attribute("r", "0.25"),
+      ]),
+      svg.circle([
+        attribute.attribute("cy", "0.12"),
+        attribute.attribute("cx", "0.12"),
+        attribute.attribute("r", "0.3"),
+      ]),
+      svg.circle([
+        attribute.attribute("cy", "-0.17"),
+        attribute.attribute("cx", "0.3"),
+        attribute.attribute("r", "0.21"),
+      ]),
+      svg.circle([
+        attribute.attribute("cy", "0"),
+        attribute.attribute("cx", "0.5"),
+        attribute.attribute("r", "0.15"),
+      ]),
+    ],
+  )
+  |> svg_scale(1.2, 1.2)
+}
+
+const cloud_positions: List(Point) = [#(-1.2, 1.8), #(1.2, 4.0)]
+
+const cloud_width: Float = 2.0
+
+const cloud_height: Float = 1.0
+
 fn svg_scale(
-  svg: lustre_element.Element(msg),
+  svg: lustre_element.Element(event),
   x: Float,
   y: Float,
-) -> lustre_element.Element(msg) {
+) -> lustre_element.Element(event) {
   svg.g(
     [
       attribute.attribute(
@@ -366,10 +435,10 @@ fn svg_scale(
 }
 
 fn svg_translate(
-  svg: lustre_element.Element(msg),
+  svg: lustre_element.Element(event),
   x: Float,
   y: Float,
-) -> lustre_element.Element(msg) {
+) -> lustre_element.Element(event) {
   svg.g(
     [
       attribute.attribute(
@@ -386,9 +455,9 @@ fn svg_translate(
 }
 
 fn svg_rotate(
-  svg: lustre_element.Element(msg),
+  svg: lustre_element.Element(event),
   angle: Float,
-) -> lustre_element.Element(msg) {
+) -> lustre_element.Element(event) {
   svg.g(
     [
       attribute.attribute(
