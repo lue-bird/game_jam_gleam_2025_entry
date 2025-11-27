@@ -5,3 +5,18 @@ submission for the [gleam game jam 2025](https://gamejam.gleam.community/)
 ```bash
 gleam run -m lustre/dev start
 ```
+
+## TODO
+- add more clouds
+- when falling, switch lucy eyes to angle inward
+- add diamonds to collect (should be in difficult to reach places)
+- add left-right screen wrapping
+- add death, diamond collect sound, switch out cloud bounce sound for something fluffy
+- add start menu
+- optional: add music
+- optional: add sound for every 50m
+- optional: add win condition like reaching a giant diamond
+- optional: add fail more conditions, e.g. falling more than 20m
+- optional: add power ups like a launchpad
+- optional: add movement abilities like grapple
+- optional: add animations for most things that have a sound
