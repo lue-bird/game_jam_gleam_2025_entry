@@ -14,9 +14,8 @@ gleam run -m lustre/dev start
 - add death, diamond collect sound, switch out cloud bounce sound for something fluffy
 - add start menu
 - optional: add music
-- optional: add sound for every 50m
+- optional: add sound for ending
 - optional: add win condition like reaching the moon
-- optional: add fail more conditions, e.g. falling more than 20m
 - optional: add power ups like a launchpad
 - optional: add movement abilities like grapple
 - optional: add animations for most things that have a sound
