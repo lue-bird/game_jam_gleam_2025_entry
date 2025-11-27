@@ -12,6 +12,7 @@ import lustre/effect
 import lustre/element as lustre_element
 import lustre/element/svg
 import lustre/event as lustre_event
+import plinth/browser/audio
 import plinth/browser/document
 import plinth/browser/element
 import plinth/browser/event
@@ -195,15 +196,23 @@ fn update(state: State, event: Event) -> #(State, effect.Effect(Event)) {
             ..state,
             lucy_angle: state.lucy_angle +. { 1.0 *. seconds_passed },
             lucy_y_per_second: case lucy_falls_on_cloud {
-              True -> 2.0
+              True -> 2.6
               False -> new_lucy_y_per_second
             },
-            lucy_y: new_lucy_y,
-            // TODO
+            lucy_y: // consider using the potentially bounced lucy_y_per_second
+            new_lucy_y,
             lucy_x_per_second: new_lucy_x_per_second,
             lucy_x: new_lucy_x,
           ),
-          effect.none(),
+          case lucy_falls_on_cloud {
+            True ->
+              effect.from(fn(_) {
+                // TODO monotone, variate pitch and adjust volume
+                let _ = audio.play(audio.new("cloud-bounce.mp3"))
+                Nil
+              })
+            False -> effect.none()
+          },
         )
       }
     }
@@ -271,11 +280,17 @@ fn view(state: State) -> lustre_element.Element(Event) {
         ]),
         svg.text(
           [
-            attribute.attribute("x", "7"),
-            attribute.attribute("y", "8.5"),
+            attribute.attribute("x", "8"),
+            attribute.attribute("y", "8.6"),
             attribute.attribute("pointer-events", "none"),
+            attribute.style("text-anchor", "middle"),
             attribute.style("font-weight", "bold"),
             attribute.style("font-size", "1px"),
+            attribute.style("font-family", "\"cubano\", monaco, courier"),
+            attribute.style(
+              "text-shadow",
+              "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black, -2px 2px black, -1.8px 1.8px black, -1.6px 1.6px black, -1.5px 1.5px black, -1px 1px black, -3px 3px black, -2px 2px black, -1px 1px black",
+            ),
             attribute.style(
               "fill",
               colour.from_rgb(0.9, 1.0, 0.86)
@@ -286,18 +301,21 @@ fn view(state: State) -> lustre_element.Element(Event) {
           state.lucy_y |> float.truncate |> int.to_string <> "m",
         )
           |> svg_scale(1.0, -1.0),
-        svg_lucy()
-          |> svg_scale(0.5, 0.5)
-          |> svg_rotate(state.lucy_angle)
-          |> svg_translate(8.0 +. state.lucy_x, -7.0 +. state.lucy_y),
-        svg.g(
-          [],
-          cloud_positions
-            |> list.map(fn(position) {
-              let #(x, y) = position
-              svg_cloud() |> svg_translate(8.0 +. x, -7.0 +. y)
-            }),
-        ),
+        svg.g([], [
+          svg_lucy()
+            |> svg_scale(0.5, 0.5)
+            |> svg_rotate(state.lucy_angle)
+            |> svg_translate(state.lucy_x, state.lucy_y),
+          svg.g(
+            [],
+            cloud_positions
+              |> list.map(fn(position) {
+                let #(x, y) = position
+                svg_cloud() |> svg_translate(x, y)
+              }),
+          ),
+        ])
+          |> svg_translate(8.0, -5.0 -. state.lucy_y),
       ])
       |> svg_scale(svg_width /. 16.0, float.negate(svg_height /. 9.0)),
     ],
