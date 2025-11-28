@@ -261,32 +261,36 @@ fn update(
               ),
               effect.none(),
             )
-            False -> #(
-              State(
-                ..state,
-                specific: Running(
-                  lucy_angle: lucy_angle +. { 1.0 *. seconds_passed },
-                  lucy_y_per_second: case lucy_falls_on_cloud {
-                    True -> 2.6
-                    False -> new_lucy_y_per_second
-                  },
-                  lucy_y: // consider using the potentially bounced lucy_y_per_second
-                  new_lucy_y,
-                  lucy_x_per_second: new_lucy_x_per_second,
-                  lucy_x: new_lucy_x,
-                  lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
+            False -> {
+              let _ = case lucy_falls_on_cloud {
+                True -> {
+                  // monotone, consider variating pitch and adjusting volume
+                  let _ = audio.play(cloud_bounce_audio)
+                  Nil
+                }
+                False -> {
+                  Nil
+                }
+              }
+              #(
+                State(
+                  ..state,
+                  specific: Running(
+                    lucy_angle: lucy_angle +. { 1.0 *. seconds_passed },
+                    lucy_y_per_second: case lucy_falls_on_cloud {
+                      True -> 2.6
+                      False -> new_lucy_y_per_second
+                    },
+                    lucy_y: // consider using the potentially bounced lucy_y_per_second
+                    new_lucy_y,
+                    lucy_x_per_second: new_lucy_x_per_second,
+                    lucy_x: new_lucy_x,
+                    lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
+                  ),
                 ),
-              ),
-              case lucy_falls_on_cloud {
-                True ->
-                  effect.from(fn(_) {
-                    // monotone, consider variating pitch and adjusting volume
-                    let _ = audio.play(cloud_bounce_audio)
-                    Nil
-                  })
-                False -> effect.none()
-              },
-            )
+                effect.none(),
+              )
+            }
           }
         }
       }
