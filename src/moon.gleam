@@ -58,21 +58,40 @@ type StateSpecific {
     lucy_angle: Float,
     lucy_x: Float,
     lucy_y: Float,
+    lucy_angle_per_second: Float,
     lucy_x_per_second: Float,
     lucy_y_per_second: Float,
     lucy_y_maximum: Float,
+    remaining_diamond_positions: List(Point),
   )
   Menu(lucy_is_hovered: Bool)
 }
 
 const initial_running_state_specific: StateSpecific = Running(
   lucy_angle: 0.0,
+  lucy_angle_per_second: -0.5,
   lucy_x_per_second: -0.67,
   lucy_y_per_second: 3.75,
   lucy_x: 2.0,
   lucy_y: -4.0,
   lucy_y_maximum: 0.0,
+  remaining_diamond_positions: all_diamond_positions,
 )
+
+const all_diamond_positions: List(Point) = [
+  #(0.0, 12.0),
+  #(-5.0, 16.0),
+  #(3.0, 24.0),
+  #(-5.8, 28.75),
+  #(4.3, 32.0),
+  #(0.0, 45.0),
+  #(2.0, 50.0),
+  #(6.0, 54.0),
+  #(-6.0, 62.0),
+  #(6.0, 69.0),
+  #(0.0, 69.8),
+  #(0.0, 88.65),
+]
 
 fn init() -> #(State, effect.Effect(Event)) {
   #(
@@ -179,6 +198,8 @@ fn update(
           lucy_x_per_second: lucy_x_per_second,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: lucy_y_maximum,
+          remaining_diamond_positions: remaining_diamond_positions,
+          lucy_angle_per_second: lucy_angle_per_second,
         ) -> {
           let effective_held_x_direction = case
             state.held_down_left,
@@ -243,6 +264,10 @@ fn update(
             True -> 2.6
             False -> new_lucy_y_per_second
           }
+          let new_lucy_angle_per_second = case effective_held_x_direction {
+            0.0 -> lucy_angle_per_second
+            _ -> effective_held_x_direction *. -1.2
+          }
           case new_lucy_y <. float.negate(screen_height *. 0.9) {
             True -> #(
               State(
@@ -270,13 +295,27 @@ fn update(
                 State(
                   ..state,
                   specific: Running(
-                    lucy_angle: lucy_angle +. { 1.0 *. seconds_passed },
+                    lucy_angle: lucy_angle
+                      +. { new_lucy_angle_per_second *. seconds_passed },
+                    lucy_angle_per_second: new_lucy_angle_per_second,
                     lucy_y_per_second: new_lucy_y_per_second,
-                    lucy_y: // consider using the potentially bounced lucy_y_per_second
-                    lucy_y +. { new_lucy_y_per_second *. seconds_passed },
+                    lucy_y: lucy_y
+                      +. { new_lucy_y_per_second *. seconds_passed },
                     lucy_x_per_second: new_lucy_x_per_second,
                     lucy_x: new_lucy_x,
                     lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
+                    remaining_diamond_positions: remaining_diamond_positions
+                      |> list.filter(fn(remaining_diamond_position) {
+                        let #(diamond_x, diamond_y) = remaining_diamond_position
+                        {
+                          float.absolute_value(new_lucy_y -. diamond_y)
+                          >. diagonal_diamond_size *. 1.6
+                        }
+                        || {
+                          float.absolute_value(new_lucy_x -. diamond_x)
+                          >. diagonal_diamond_size *. 1.6
+                        }
+                      }),
                   ),
                 ),
                 effect.none(),
@@ -312,7 +351,7 @@ const goal_y: Float = 100.0
 
 fn view(
   state: State,
-  environment_svg: lustre_element.Element(_event),
+  svg_environment: lustre_element.Element(_event),
 ) -> lustre_element.Element(Event) {
   let ration_width_to_height: Float = screen_width /. screen_height
   let #(svg_width, svg_height) = case
@@ -384,7 +423,7 @@ fn view(
               )
                 |> svg_scale(1.0, -1.0),
               svg.g([], [
-                environment_svg,
+                svg_environment,
                 case lucy_is_hovered {
                   True ->
                     svg_lucy(True)
@@ -414,14 +453,17 @@ fn view(
           lucy_angle: lucy_angle,
           lucy_x: lucy_x,
           lucy_y: lucy_y,
+          lucy_angle_per_second: _,
           lucy_x_per_second: _,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: _,
+          remaining_diamond_positions: remaining_diamond_positions,
         ) -> {
           let progress: Float =
             lucy_y *. { 1.0 /. goal_y }
             |> float.max(0.0)
             |> float.min(1.0)
+          let svg_diamond = svg_diamond()
           svg.g([], [
             svg.rect([
               attribute.attribute("x", "0"),
@@ -472,7 +514,15 @@ fn view(
                 |> svg_scale(0.5, 0.5)
                 |> svg_rotate(lucy_angle)
                 |> svg_translate(lucy_x, lucy_y),
-              environment_svg,
+              svg.g(
+                [],
+                remaining_diamond_positions
+                  |> list.map(fn(remaining_diamond_position) {
+                    let #(x, y) = remaining_diamond_position
+                    svg_diamond |> svg_translate(x, y)
+                  }),
+              ),
+              svg_environment,
             ])
               |> svg_translate(
                 screen_width /. 2.0,
@@ -488,6 +538,48 @@ fn view(
       ),
     ],
   )
+}
+
+const diagonal_diamond_size: Float = 0.45
+
+fn svg_diamond() -> lustre_element.Element(_event) {
+  svg.g([], [
+    svg.rect([
+      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
+      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
+      attribute.style(
+        "fill",
+        colour.from_rgb(0.5, 0.6, 0.9)
+          |> result.unwrap(colour.black)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
+      |> svg_rotate(maths.pi() /. 4.0),
+    svg.rect([
+      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
+      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
+      attribute.style(
+        "fill",
+        colour.from_rgb(0.5, 0.8, 1.0)
+          |> result.unwrap(colour.black)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
+      |> svg_rotate(maths.pi() /. 4.0)
+      |> svg_scale(0.66, 1.0),
+    svg.rect([
+      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
+      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
+      attribute.style(
+        "fill",
+        colour.from_rgb(0.8, 1.0, 1.0)
+          |> result.unwrap(colour.black)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
+      |> svg_rotate(maths.pi() /. 4.0)
+      |> svg_scale(0.33, 1.0),
+  ])
 }
 
 fn star_positions() -> List(Point) {
@@ -523,7 +615,7 @@ fn star_positions() -> List(Point) {
   })
 }
 
-fn svg_environment() {
+fn svg_environment() -> lustre_element.Element(_event) {
   let svg_bird = svg_bird()
   let svg_birds =
     svg.g(
@@ -623,7 +715,10 @@ fn svg_small_star() -> lustre_element.Element(_event) {
 }
 
 fn svg_bird() -> lustre_element.Element(_event) {
-  let color = "white"
+  let color =
+    colour.from_rgb(0.4, 0.6, 0.8)
+    |> result.unwrap(colour.white)
+    |> colour.to_css_rgba_string
   let wing_radius = 0.2
   let wing =
     svg.circle([
@@ -641,6 +736,7 @@ fn svg_bird() -> lustre_element.Element(_event) {
       |> svg_scale(-1.0, 1.0)
       |> svg_translate(wing_radius *. 2.0, 0.0),
   ])
+  |> svg_scale(1.6, 1.0)
 }
 
 fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
@@ -719,7 +815,7 @@ fn lucy_closed_eye() -> lustre_element.Element(_event) {
   |> svg_scale(0.7, 0.7)
 }
 
-/// TODO make svg_lucy etc depend on it
+/// try to make svg_lucy etc depend on it in some form
 const lucy_radius = 0.5
 
 fn lucy_path() -> String {

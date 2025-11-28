@@ -9,8 +9,7 @@ gleam run -m lustre/dev start
 ```
 
 ## TODO
-- add diamonds to collect (should be in difficult to reach places)
-- add death, diamond collect sound, switch out cloud bounce sound for something fluffy
+- add diamond collect sound
 - optional: add music
 - optional: add text and sound for ending
 - optional: add win condition like reaching the moon
