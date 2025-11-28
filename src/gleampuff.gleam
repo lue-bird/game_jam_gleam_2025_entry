@@ -60,18 +60,25 @@ pub fn main() {
 
 type State {
   State(
+    specific: StateSpecific,
     window_width: Float,
     window_height: Float,
     held_down_left: Bool,
     held_down_right: Bool,
+    lucy_y_highscore: Float,
+  )
+}
+
+type StateSpecific {
+  Running(
     lucy_angle: Float,
     lucy_x: Float,
     lucy_y: Float,
     lucy_x_per_second: Float,
     lucy_y_per_second: Float,
     lucy_y_maximum: Float,
-    lucy_y_highscore: Float,
   )
+  Menu(lucy_is_hovered: Bool)
 }
 
 const initial_lucy_y_per_second: Float = 2.3
@@ -79,16 +86,11 @@ const initial_lucy_y_per_second: Float = 2.3
 fn init() -> #(State, effect.Effect(Event)) {
   #(
     State(
+      specific: Menu(lucy_is_hovered: False),
       window_height: window.inner_height(window.self()) |> int.to_float,
       window_width: window.inner_width(window.self()) |> int.to_float,
       held_down_left: False,
       held_down_right: False,
-      lucy_angle: 0.0,
-      lucy_x_per_second: 0.0,
-      lucy_y_per_second: initial_lucy_y_per_second,
-      lucy_x: 0.0,
-      lucy_y: 0.0,
-      lucy_y_maximum: 0.0,
       lucy_y_highscore: 0.0,
     ),
     effect.batch([
@@ -119,6 +121,9 @@ type Event {
   SimulationTickPassed
   KeyPressed(String)
   KeyReleased(String)
+  MenuLucyHoverStarted
+  MenuLucyHoverEnded
+  MenuLucyPressed
 }
 
 fn update(
@@ -127,6 +132,28 @@ fn update(
   event: Event,
 ) -> #(State, effect.Effect(Event)) {
   case event {
+    MenuLucyHoverStarted -> #(
+      State(..state, specific: Menu(lucy_is_hovered: True)),
+      effect.none(),
+    )
+    MenuLucyHoverEnded -> #(
+      State(..state, specific: Menu(lucy_is_hovered: False)),
+      effect.none(),
+    )
+    MenuLucyPressed -> #(
+      State(
+        ..state,
+        specific: Running(
+          lucy_angle: 0.0,
+          lucy_x_per_second: 0.0,
+          lucy_y_per_second: initial_lucy_y_per_second,
+          lucy_x: 0.0,
+          lucy_y: 0.0,
+          lucy_y_maximum: 0.0,
+        ),
+      ),
+      effect.none(),
+    )
     Resized -> #(
       State(
         ..state,
@@ -162,101 +189,122 @@ fn update(
       }
     }
     SimulationTickPassed -> {
-      let effective_held_x_direction = case
-        state.held_down_left,
-        state.held_down_right
-      {
-        True, False -> -1.0
-        False, True -> 1.0
-        True, True | False, False -> 0.0
-      }
-      let seconds_passed = 1.0 /. { 1000 / 60 |> int.to_float }
-      let new_lucy_y_per_second =
-        state.lucy_y_per_second -. { 1.0 *. seconds_passed } |> float.max(-2.2)
-      let new_lucy_x_per_second =
-        state.lucy_x_per_second
-        *. { 1.0 -. { 0.2 *. seconds_passed } }
-        +. {
-          effective_held_x_direction
-          *. {
-            4.4
-            -. float.absolute_value(
-              state.lucy_x_per_second +. effective_held_x_direction *. 2.2,
+      case state.specific {
+        Menu(_) -> #(state, effect.none())
+        Running(
+          lucy_angle: lucy_angle,
+          lucy_x: lucy_x,
+          lucy_y: lucy_y,
+          lucy_x_per_second: lucy_x_per_second,
+          lucy_y_per_second: lucy_y_per_second,
+          lucy_y_maximum: lucy_y_maximum,
+        ) -> {
+          let effective_held_x_direction = case
+            state.held_down_left,
+            state.held_down_right
+          {
+            True, False -> -1.0
+            False, True -> 1.0
+            True, True | False, False -> 0.0
+          }
+          let seconds_passed = 1.0 /. { 1000 / 60 |> int.to_float }
+          let new_lucy_y_per_second =
+            lucy_y_per_second -. { 1.0 *. seconds_passed }
+            |> float.max(-2.2)
+          let new_lucy_x_per_second =
+            lucy_x_per_second
+            *. { 1.0 -. { 0.2 *. seconds_passed } }
+            +. {
+              effective_held_x_direction
+              *. {
+                4.4
+                -. float.absolute_value(
+                  lucy_x_per_second +. effective_held_x_direction *. 2.2,
+                )
+              }
+              *. 3.0
+              *. seconds_passed
+            }
+          let new_lucy_y = lucy_y +. { new_lucy_y_per_second *. seconds_passed }
+          let new_lucy_x_not_wrapped =
+            lucy_x +. { new_lucy_x_per_second *. seconds_passed }
+          let new_lucy_x = case
+            new_lucy_x_not_wrapped
+            <. float.negate(screen_width /. 2.0 +. lucy_radius)
+          {
+            True ->
+              new_lucy_x_not_wrapped +. { screen_width +. lucy_radius *. 2.0 }
+            False ->
+              case
+                new_lucy_x_not_wrapped >. screen_width /. 2.0 +. lucy_radius
+              {
+                True ->
+                  new_lucy_x_not_wrapped
+                  -. { screen_width +. lucy_radius *. 2.0 }
+                False -> new_lucy_x_not_wrapped
+              }
+          }
+          let lucy_falls_on_cloud: Bool =
+            new_lucy_y_per_second <. 0.0
+            && cloud_positions
+            |> list.any(fn(cloud_position) {
+              let #(cloud_x, cloud_y) = cloud_position
+              {
+                float.absolute_value(new_lucy_y -. cloud_y)
+                <=. { cloud_height /. 2.0 }
+              }
+              && {
+                float.absolute_value(new_lucy_x -. cloud_x)
+                <=. { cloud_width /. 2.0 }
+              }
+            })
+          case new_lucy_y <. float.negate(screen_height *. 0.9) {
+            True -> #(
+              State(
+                specific: Running(
+                  lucy_angle: 0.0,
+                  lucy_y_per_second: initial_lucy_y_per_second,
+                  lucy_y: 0.0,
+                  lucy_x_per_second: 0.0,
+                  lucy_x: 0.0,
+                  lucy_y_maximum: 0.0,
+                ),
+                window_width: state.window_width,
+                window_height: state.window_height,
+                held_down_left: state.held_down_left,
+                held_down_right: state.held_down_right,
+                lucy_y_highscore: lucy_y_maximum,
+              ),
+              effect.none(),
+            )
+            False -> #(
+              State(
+                ..state,
+                specific: Running(
+                  lucy_angle: lucy_angle +. { 1.0 *. seconds_passed },
+                  lucy_y_per_second: case lucy_falls_on_cloud {
+                    True -> 2.6
+                    False -> new_lucy_y_per_second
+                  },
+                  lucy_y: // consider using the potentially bounced lucy_y_per_second
+                  new_lucy_y,
+                  lucy_x_per_second: new_lucy_x_per_second,
+                  lucy_x: new_lucy_x,
+                  lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
+                ),
+              ),
+              case lucy_falls_on_cloud {
+                True ->
+                  effect.from(fn(_) {
+                    // monotone, consider variating pitch and adjusting volume
+                    let _ = audio.play(cloud_bounce_audio)
+                    Nil
+                  })
+                False -> effect.none()
+              },
             )
           }
-          *. 3.0
-          *. seconds_passed
         }
-      let new_lucy_y =
-        state.lucy_y +. { new_lucy_y_per_second *. seconds_passed }
-      let new_lucy_x_not_wrapped =
-        state.lucy_x +. { new_lucy_x_per_second *. seconds_passed }
-      let new_lucy_x = case
-        new_lucy_x_not_wrapped
-        <. float.negate(screen_width /. 2.0 +. lucy_radius)
-      {
-        True -> new_lucy_x_not_wrapped +. { screen_width +. lucy_radius *. 2.0 }
-        False ->
-          case new_lucy_x_not_wrapped >. screen_width /. 2.0 +. lucy_radius {
-            True ->
-              new_lucy_x_not_wrapped -. { screen_width +. lucy_radius *. 2.0 }
-            False -> new_lucy_x_not_wrapped
-          }
-      }
-      let lucy_falls_on_cloud: Bool =
-        new_lucy_y_per_second <. 0.0
-        && cloud_positions
-        |> list.any(fn(cloud_position) {
-          let #(cloud_x, cloud_y) = cloud_position
-          {
-            float.absolute_value(new_lucy_y -. cloud_y)
-            <=. { cloud_height /. 2.0 }
-          }
-          && {
-            float.absolute_value(new_lucy_x -. cloud_x)
-            <=. { cloud_width /. 2.0 }
-          }
-        })
-      case new_lucy_y <. float.negate(screen_height *. 0.9) {
-        True -> #(
-          State(
-            window_width: state.window_width,
-            window_height: state.window_height,
-            held_down_left: state.held_down_left,
-            held_down_right: state.held_down_right,
-            lucy_angle: 0.0,
-            lucy_y_per_second: initial_lucy_y_per_second,
-            lucy_y: 0.0,
-            lucy_x_per_second: 0.0,
-            lucy_x: 0.0,
-            lucy_y_maximum: 0.0,
-            lucy_y_highscore: state.lucy_y_maximum,
-          ),
-          effect.none(),
-        )
-        False -> #(
-          State(
-            ..state,
-            lucy_angle: state.lucy_angle +. { 1.0 *. seconds_passed },
-            lucy_y_per_second: case lucy_falls_on_cloud {
-              True -> 2.6
-              False -> new_lucy_y_per_second
-            },
-            lucy_y: // consider using the potentially bounced lucy_y_per_second
-            new_lucy_y,
-            lucy_x_per_second: new_lucy_x_per_second,
-            lucy_x: new_lucy_x,
-          ),
-          case lucy_falls_on_cloud {
-            True ->
-              effect.from(fn(_) {
-                // monotone, consider variating pitch and adjusting volume
-                let _ = audio.play(cloud_bounce_audio)
-                Nil
-              })
-            False -> effect.none()
-          },
-        )
       }
     }
   }
@@ -300,11 +348,6 @@ fn view(
       // might be disproportional in width
       #(state.window_height *. ration_width_to_height, state.window_height)
   }
-  let progress: Float =
-    state.lucy_y *. { 1.0 /. goal_y }
-    // TODO set to final height (200 or something) 
-    |> float.max(0.0)
-    |> float.min(1.0)
 
   svg.svg(
     [
@@ -323,62 +366,151 @@ fn view(
       attribute.height(svg_height |> float.truncate),
     ],
     [
-      svg.g([], [
-        svg.rect([
-          attribute.attribute("x", "0"),
-          attribute.attribute("y", "-100%"),
-          attribute.attribute("width", "100%"),
-          attribute.attribute("height", "100%"),
-          attribute.attribute(
-            "fill",
-            colour.from_rgb(
-              state.lucy_y *. { -1.0 /. screen_height }
-                |> float.max(0.0)
-                |> float.min(0.7),
-              { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
-              0.6 -. { progress *. 0.56 },
+      case state.specific {
+        Menu(lucy_is_hovered: lucy_is_hovered) ->
+          svg.g(
+            [
+              lustre_event.on_mouse_down(MenuLucyPressed),
+            ],
+            [
+              svg.rect([
+                attribute.attribute("x", "0"),
+                attribute.attribute("y", "-100%"),
+                attribute.attribute("width", "100%"),
+                attribute.attribute("height", "100%"),
+                attribute.attribute(
+                  "fill",
+                  colour.from_rgb(0.0, 0.45, 0.6)
+                    |> result.unwrap(colour.black)
+                    |> colour.to_css_rgba_string,
+                ),
+              ]),
+              svg.text(
+                [
+                  attribute.attribute(
+                    "x",
+                    screen_width /. 2.0 |> float.to_string,
+                  ),
+                  attribute.attribute(
+                    "y",
+                    screen_height *. 0.84 |> float.to_string,
+                  ),
+                  attribute.attribute("pointer-events", "none"),
+                  attribute.style("text-anchor", "middle"),
+                  attribute.style("font-weight", "bold"),
+                  attribute.style("font-size", "1px"),
+                  attribute.style("font-family", "\"cubano\", monaco, courier"),
+                  attribute.style(
+                    "fill",
+                    colour.from_rgb(0.9, 1.0, 0.86)
+                      |> result.unwrap(colour.black)
+                      |> colour.to_css_rgba_string,
+                  ),
+                ],
+                "←/→ or a/d",
+              )
+                |> svg_scale(1.0, -1.0),
+              svg.g([], [
+                case lucy_is_hovered {
+                  True ->
+                    svg_lucy(True)
+                    |> svg_rotate(maths.pi() *. 0.05)
+                  False -> svg_lucy(False)
+                }
+                  |> svg_scale(2.0, 2.0),
+
+                svg.circle([
+                  lustre_event.on_mouse_enter(MenuLucyHoverStarted),
+                  lustre_event.on_mouse_leave(MenuLucyHoverEnded),
+                  attribute.attribute(
+                    "fill",
+                    colour.from_rgba(1.0, 1.0, 1.0, 0.01)
+                      |> result.unwrap(colour.black)
+                      |> colour.to_css_rgba_string,
+                  ),
+                  attribute.attribute("r", "2.0"),
+                ]),
+                clouds_svg,
+              ])
+                |> svg_translate(
+                  screen_width /. 2.0,
+                  float.negate(screen_height *. 0.5),
+                ),
+            ],
+          )
+        Running(
+          lucy_angle: lucy_angle,
+          lucy_x: lucy_x,
+          lucy_y: lucy_y,
+          lucy_x_per_second: _,
+          lucy_y_per_second: lucy_y_per_second,
+          lucy_y_maximum: _,
+        ) -> {
+          let progress: Float =
+            lucy_y *. { 1.0 /. goal_y }
+            |> float.max(0.0)
+            |> float.min(1.0)
+          svg.g([], [
+            svg.rect([
+              attribute.attribute("x", "0"),
+              attribute.attribute("y", "-100%"),
+              attribute.attribute("width", "100%"),
+              attribute.attribute("height", "100%"),
+              attribute.attribute(
+                "fill",
+                colour.from_rgb(
+                  lucy_y *. { -1.0 /. screen_height }
+                    |> float.max(0.0)
+                    |> float.min(0.7),
+                  { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
+                  0.6 -. { progress *. 0.56 },
+                )
+                  |> result.unwrap(colour.black)
+                  |> colour.to_css_rgba_string,
+              ),
+            ]),
+            svg.text(
+              [
+                attribute.attribute("x", screen_width /. 2.0 |> float.to_string),
+                attribute.attribute(
+                  "y",
+                  screen_height *. 0.95 |> float.to_string,
+                ),
+                attribute.attribute("pointer-events", "none"),
+                attribute.style("text-anchor", "middle"),
+                attribute.style("font-weight", "bold"),
+                attribute.style("font-size", "1px"),
+                attribute.style("font-family", "\"cubano\", monaco, courier"),
+                attribute.style(
+                  "text-shadow",
+                  "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black, -2px 2px black, -1.8px 1.8px black, -1.6px 1.6px black, -1.5px 1.5px black, -1px 1px black, -3px 3px black, -2px 2px black, -1px 1px black",
+                ),
+                attribute.style(
+                  "fill",
+                  colour.from_rgb(0.9, 1.0, 0.86)
+                    |> result.unwrap(colour.black)
+                    |> colour.to_css_rgba_string,
+                ),
+              ],
+              lucy_y |> float.truncate |> int.to_string <> "m",
             )
-              |> result.unwrap(colour.black)
-              |> colour.to_css_rgba_string,
-          ),
-        ]),
-        svg.text(
-          [
-            attribute.attribute("x", screen_width /. 2.0 |> float.to_string),
-            attribute.attribute("y", screen_height *. 0.95 |> float.to_string),
-            attribute.attribute("pointer-events", "none"),
-            attribute.style("text-anchor", "middle"),
-            attribute.style("font-weight", "bold"),
-            attribute.style("font-size", "1px"),
-            attribute.style("font-family", "\"cubano\", monaco, courier"),
-            attribute.style(
-              "text-shadow",
-              "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black, -2px 2px black, -1.8px 1.8px black, -1.6px 1.6px black, -1.5px 1.5px black, -1px 1px black, -3px 3px black, -2px 2px black, -1px 1px black",
-            ),
-            attribute.style(
-              "fill",
-              colour.from_rgb(0.9, 1.0, 0.86)
-                |> result.unwrap(colour.black)
-                |> colour.to_css_rgba_string,
-            ),
-          ],
-          state.lucy_y |> float.truncate |> int.to_string <> "m",
-        )
-          |> svg_scale(1.0, -1.0),
-        svg.g([], [
-          svg_lucy(state.lucy_y_per_second <. -1.0)
-            |> svg_scale(0.5, 0.5)
-            |> svg_rotate(state.lucy_angle)
-            |> svg_translate(state.lucy_x, state.lucy_y),
-          clouds_svg,
-          stars_svg,
-        ])
-          |> svg_translate(
-            screen_width /. 2.0,
-            float.negate(screen_height *. 0.56)
-              -. { state.lucy_y |> float.max(0.0) },
-          ),
-      ])
+              |> svg_scale(1.0, -1.0),
+            svg.g([], [
+              svg_lucy(lucy_y_per_second <. -0.8)
+                |> svg_scale(0.5, 0.5)
+                |> svg_rotate(lucy_angle)
+                |> svg_translate(lucy_x, lucy_y),
+              clouds_svg,
+              stars_svg,
+            ])
+              |> svg_translate(
+                screen_width /. 2.0,
+                float.negate(screen_height *. 0.56)
+                  -. { lucy_y |> float.max(0.0) },
+              ),
+          ])
+        }
+      }
       |> svg_scale(
         svg_width /. screen_width,
         float.negate(svg_height /. screen_height),
@@ -428,15 +560,28 @@ fn svg_small_star() -> lustre_element.Element(_event) {
   ])
 }
 
-fn svg_lucy(is_falling: Bool) -> lustre_element.Element(event) {
-  let svg_lucy_eye = case is_falling {
+fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
+  let svg_lucy_eye = case is_excited {
     True -> lucy_closed_eye()
     False ->
       svg.circle([
-        attribute.attribute("r", "0.1"),
+        attribute.attribute("r", "0.08"),
         attribute.attribute("fill", "black"),
       ])
   }
+  let svg_cheek =
+    svg.circle([
+      attribute.attribute("r", "0.05"),
+      attribute.attribute(
+        "fill",
+        case is_excited {
+          False -> colour.from_rgba(1.0, 0.0, 0.0, 0.1)
+          True -> colour.from_rgba(1.0, 0.0, 0.0, 0.2)
+        }
+          |> result.unwrap(colour.red)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
   svg.g([], [
     svg.path([
       attribute.attribute("stroke-width", "0.23"),
@@ -452,19 +597,24 @@ fn svg_lucy(is_falling: Bool) -> lustre_element.Element(event) {
           |> colour.to_css_rgba_string,
       ),
       attribute.attribute("d", lucy_path()),
-    ]),
+    ])
+      |> svg_rotate(-0.33),
     svg_lucy_eye
-      |> svg_translate(-0.2, 0.12),
+      |> svg_translate(-0.3, 0.12),
     svg_lucy_eye
       |> svg_rotate(maths.pi())
-      |> svg_translate(0.2, 0.12),
+      |> svg_translate(0.3, 0.12),
+    svg_cheek
+      |> svg_translate(-0.3, -0.08),
+    svg_cheek
+      |> svg_translate(0.3, -0.08),
     svg.circle([
-      attribute.attribute("cy", "-0.1"),
+      attribute.attribute("cy", "0.0"),
       attribute.attribute("cx", "0"),
       attribute.attribute("r", "0.12"),
       attribute.attribute("fill", "none"),
       attribute.attribute("stroke", "black"),
-      attribute.attribute("stroke-width", "0.08"),
+      attribute.attribute("stroke-width", "0.06"),
       attribute.attribute("pathLength", "360"),
       attribute.attribute("stroke-dasharray", "0 180 180"),
       attribute.attribute("stroke-linecap", "round"),
