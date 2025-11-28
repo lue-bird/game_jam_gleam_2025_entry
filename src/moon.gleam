@@ -23,101 +23,14 @@ pub fn main() {
   let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
   // the whole "to avoid recomputing unchanging svgs, pass them from main"
   // thing seems super dumb. Is there something better?
-  let svg_bird = svg_bird()
-  let svg_birds =
-    svg.g(
-      [],
-      [
-        #(4.4, -4.4, 1.5),
-        #(-2.9, -4.3, 1.1),
-        #(2.4, -3.7, 0.5),
-        #(5.4, -3.4, 1.5),
-        #(2.0, 1.0, 1.0),
-        #(5.0, 3.0, 0.5),
-        #(-5.2, 5.0, 0.5),
-        #(4.0, 7.0, 1.2),
-        #(-4.8, 8.0, 1.2),
-        #(4.6, 9.0, 0.3),
-        #(1.0, 11.0, 0.4),
-        #(-4.0, 12.8, 0.4),
-        #(1.4, 14.0, 0.9),
-        #(1.0, 16.0, 0.9),
-        #(4.6, 18.5, 0.4),
-        #(0.0, 20.0, 0.9),
-        #(-4.0, 122.8, 0.4),
-        #(1.4, 24.0, 0.9),
-        #(-4.8, 24.1, 1.0),
-        #(-4.0, 25.6, 0.6),
-        #(1.0, 26.0, 0.9),
-        #(4.9, 30.2, 0.9),
-      ]
-        |> list.map(fn(position) {
-          let #(x, y, scale) = position
-          svg_bird
-          |> svg_scale(scale, scale)
-          |> svg_translate(x, y)
-        }),
-    )
-  let stars_svg =
-    svg.g(
-      [],
-      star_positions()
-        |> list.map(fn(star_position) {
-          let #(x, y) = star_position
-          svg_small_star()
-          |> svg_translate(x, y)
-        }),
-    )
-  let svg_cloud = svg_cloud()
-  let clouds_svg =
-    svg.g(
-      [],
-      cloud_positions
-        |> list.map(fn(position) {
-          let #(x, y) = position
-          svg_cloud |> svg_translate(x, y)
-        }),
-    )
-  let svg_fog = svg_fog()
-  let fog_svg =
-    svg.g(
-      [],
-      // I'd love to add more bug it seems to be extremely taxing to render
-      [
-        #(2.4, -4.4, 1.5),
-        #(2.0, 1.0, 1.0),
-        #(-2.0, 5.0, 0.5),
-        #(4.0, 10.0, 1.2),
-        #(4.6, 14.0, 0.2),
-        #(1.0, 20.0, 0.2),
-        #(-4.0, 24.8, 0.4),
-        #(1.4, 30.0, 0.9),
-        #(1.0, 60.0, 0.9),
-        #(4.6, 84.5, 0.4),
-        #(0.0, 100.0, 0.9),
-      ]
-        |> list.map(fn(position) {
-          let #(x, y, scale) = position
-          svg_fog
-          |> svg_scale(scale, scale)
-          |> svg_translate(x, y)
-        }),
-    )
-  let environment_svg =
-    svg.g([], [
-      clouds_svg,
-      fog_svg,
-      stars_svg,
-      svg_birds,
-      svg_moon()
-        |> svg_translate(0.0, 101.0),
-    ])
+  let svg_environment =
+    svg_environment()
     |> as_static_lustre_component()
   let app =
     lustre.application(
       fn(_: Nil) { init() },
       fn(event, state) { update(cloud_bounce_audio, event, state) },
-      fn(state) { view(state, environment_svg) },
+      fn(state) { view(state, svg_environment) },
     )
   // I couldn't get "using custom index.html with lustre/dev start" to work
   element.set_attribute(
@@ -619,6 +532,97 @@ fn star_positions() -> List(Point) {
       )
     })
   })
+}
+
+fn svg_environment() {
+  let svg_bird = svg_bird()
+  let svg_birds =
+    svg.g(
+      [],
+      [
+        #(4.4, -4.4, 1.5),
+        #(-2.9, -4.3, 1.1),
+        #(2.4, -3.7, 0.5),
+        #(5.4, -3.4, 1.5),
+        #(2.0, 1.0, 1.0),
+        #(5.0, 3.0, 0.5),
+        #(-5.2, 5.0, 0.5),
+        #(4.0, 7.0, 1.2),
+        #(-4.8, 8.0, 1.2),
+        #(4.6, 9.0, 0.3),
+        #(1.0, 11.0, 0.4),
+        #(-4.0, 12.8, 0.4),
+        #(1.4, 14.0, 0.9),
+        #(1.0, 16.0, 0.9),
+        #(4.6, 18.5, 0.4),
+        #(0.0, 20.0, 0.9),
+        #(-4.0, 122.8, 0.4),
+        #(1.4, 24.0, 0.9),
+        #(-4.8, 24.1, 1.0),
+        #(-4.0, 25.6, 0.6),
+        #(1.0, 26.0, 0.9),
+        #(4.9, 30.2, 0.9),
+      ]
+        |> list.map(fn(position) {
+          let #(x, y, scale) = position
+          svg_bird
+          |> svg_scale(scale, scale)
+          |> svg_translate(x, y)
+        }),
+    )
+  let svg_stars =
+    svg.g(
+      [],
+      star_positions()
+        |> list.map(fn(star_position) {
+          let #(x, y) = star_position
+          svg_small_star()
+          |> svg_translate(x, y)
+        }),
+    )
+  let svg_cloud = svg_cloud()
+  let clouds_svg =
+    svg.g(
+      [],
+      cloud_positions
+        |> list.map(fn(position) {
+          let #(x, y) = position
+          svg_cloud |> svg_translate(x, y)
+        }),
+    )
+  let svg_fog = svg_fog()
+  let fog_svg =
+    svg.g(
+      [],
+      // I'd love to add more bug it seems to be extremely taxing to render
+      [
+        #(2.4, -4.4, 1.5),
+        #(2.0, 1.0, 1.0),
+        #(-2.0, 5.0, 0.5),
+        #(4.0, 10.0, 1.2),
+        #(4.6, 14.0, 0.2),
+        #(1.0, 20.0, 0.2),
+        #(-4.0, 24.8, 0.4),
+        #(1.4, 30.0, 0.9),
+        #(1.0, 60.0, 0.9),
+        #(4.6, 84.5, 0.4),
+        #(0.0, 100.0, 0.9),
+      ]
+        |> list.map(fn(position) {
+          let #(x, y, scale) = position
+          svg_fog
+          |> svg_scale(scale, scale)
+          |> svg_translate(x, y)
+        }),
+    )
+  svg.g([], [
+    clouds_svg,
+    fog_svg,
+    svg_stars,
+    svg_birds,
+    svg_moon()
+      |> svg_translate(0.0, 101.0),
+  ])
 }
 
 fn svg_small_star() -> lustre_element.Element(_event) {
