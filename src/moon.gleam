@@ -309,11 +309,11 @@ fn update(
                         let #(diamond_x, diamond_y) = remaining_diamond_position
                         {
                           float.absolute_value(new_lucy_y -. diamond_y)
-                          >. diagonal_diamond_size *. 1.6
+                          >. diagonal_diamond_size *. 1.55
                         }
                         || {
                           float.absolute_value(new_lucy_x -. diamond_x)
-                          >. diagonal_diamond_size *. 1.6
+                          >. diagonal_diamond_size *. 1.55
                         }
                       }),
                   ),
@@ -464,6 +464,15 @@ fn view(
             |> float.max(0.0)
             |> float.min(1.0)
           let svg_diamond = svg_diamond()
+          let svg_diamonds =
+            svg.g(
+              [],
+              remaining_diamond_positions
+                |> list.map(fn(remaining_diamond_position) {
+                  let #(x, y) = remaining_diamond_position
+                  svg_diamond |> svg_translate(x, y)
+                }),
+            )
           svg.g([], [
             svg.rect([
               attribute.attribute("x", "0"),
@@ -509,19 +518,13 @@ fn view(
               lucy_y |> float.truncate |> int.to_string <> "m",
             )
               |> svg_scale(1.0, -1.0),
+
             svg.g([], [
+              svg_diamonds,
               svg_lucy(lucy_y_per_second <. -0.8)
                 |> svg_scale(0.5, 0.5)
                 |> svg_rotate(lucy_angle)
                 |> svg_translate(lucy_x, lucy_y),
-              svg.g(
-                [],
-                remaining_diamond_positions
-                  |> list.map(fn(remaining_diamond_position) {
-                    let #(x, y) = remaining_diamond_position
-                    svg_diamond |> svg_translate(x, y)
-                  }),
-              ),
               svg_environment,
             ])
               |> svg_translate(
@@ -549,7 +552,7 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
         "fill",
-        colour.from_rgb(0.5, 0.6, 0.9)
+        colour.from_rgb(0.65, 0.55, 0.0)
           |> result.unwrap(colour.black)
           |> colour.to_css_rgba_string,
       ),
@@ -560,7 +563,7 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
         "fill",
-        colour.from_rgb(0.5, 0.8, 1.0)
+        colour.from_rgb(0.8, 0.72, 0.2)
           |> result.unwrap(colour.black)
           |> colour.to_css_rgba_string,
       ),
@@ -572,7 +575,7 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
         "fill",
-        colour.from_rgb(0.8, 1.0, 1.0)
+        colour.from_rgb(1.0, 0.9, 0.6)
           |> result.unwrap(colour.black)
           |> colour.to_css_rgba_string,
       ),
