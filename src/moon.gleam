@@ -239,6 +239,10 @@ fn update(
                 <=. { cloud_width /. 2.0 }
               }
             })
+          let new_lucy_y_per_second = case lucy_falls_on_cloud {
+            True -> 2.6
+            False -> new_lucy_y_per_second
+          }
           case new_lucy_y <. float.negate(screen_height *. 0.9) {
             True -> #(
               State(
@@ -267,12 +271,9 @@ fn update(
                   ..state,
                   specific: Running(
                     lucy_angle: lucy_angle +. { 1.0 *. seconds_passed },
-                    lucy_y_per_second: case lucy_falls_on_cloud {
-                      True -> 2.6
-                      False -> new_lucy_y_per_second
-                    },
+                    lucy_y_per_second: new_lucy_y_per_second,
                     lucy_y: // consider using the potentially bounced lucy_y_per_second
-                    new_lucy_y,
+                    lucy_y +. { new_lucy_y_per_second *. seconds_passed },
                     lucy_x_per_second: new_lucy_x_per_second,
                     lucy_x: new_lucy_x,
                     lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
@@ -944,7 +945,7 @@ const cloud_positions: List(Point) = [
 
 const cloud_width: Float = 2.0
 
-const cloud_height: Float = 1.0
+const cloud_height: Float = 1.1
 
 fn svg_scale(
   svg: lustre_element.Element(event),
