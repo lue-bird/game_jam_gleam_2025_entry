@@ -43,6 +43,7 @@ pub fn main() {
           svg_cloud |> svg_translate(x, y)
         }),
     )
+  let svg_fog = svg_fog()
   let fog_svg =
     svg.g(
       [],
@@ -62,14 +63,20 @@ pub fn main() {
       ]
         |> list.map(fn(position) {
           let #(x, y, scale) = position
-          svg_fog()
+          svg_fog
           |> svg_scale(scale, scale)
           |> svg_translate(x, y)
         }),
     )
-  let environment_svg =
-    svg.g([], [clouds_svg, fog_svg, stars_svg])
     |> as_static_lustre_component()
+  let environment_svg =
+    svg.g([], [
+      clouds_svg,
+      fog_svg,
+      stars_svg,
+      svg_moon()
+        |> svg_translate(0.0, 101.0),
+    ])
   let app =
     lustre.application(
       fn(_: Nil) { init() },
@@ -176,7 +183,8 @@ fn update(
           lucy_x_per_second: 0.0,
           lucy_y_per_second: initial_lucy_y_per_second,
           lucy_x: 0.0,
-          lucy_y: 0.0,
+          lucy_y: 96.0,
+          // TODO 0.0,
           lucy_y_maximum: 0.0,
         ),
       ),
@@ -587,7 +595,7 @@ fn svg_small_star() -> lustre_element.Element(_event) {
 }
 
 fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
-  let svg_lucy_eye = case is_excited {
+  let svg_eye = case is_excited {
     True -> lucy_closed_eye()
     False ->
       svg.circle([
@@ -625,9 +633,9 @@ fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
       attribute.attribute("d", lucy_path()),
     ])
       |> svg_rotate(-0.33),
-    svg_lucy_eye
+    svg_eye
       |> svg_translate(-0.3, 0.12),
-    svg_lucy_eye
+    svg_eye
       |> svg_rotate(maths.pi())
       |> svg_translate(0.3, 0.12),
     svg_cheek
@@ -698,6 +706,52 @@ fn lucy_shape_points() -> List(#(Point, Point)) {
 fn lucy_color() {
   colour.from_rgb(1.0, 0.5, 1.0)
   |> result.unwrap(colour.black)
+}
+
+fn svg_moon() {
+  let color =
+    colour.from_rgb(0.2, 0.0, 0.6)
+    |> result.unwrap(colour.white)
+    |> colour.to_css_rgba_string
+  let svg_eye =
+    lucy_closed_eye()
+    |> svg_rotate(maths.pi() /. 2.0)
+  let svg_cheek =
+    svg.circle([
+      attribute.attribute("r", "0.08"),
+      attribute.attribute(
+        "fill",
+        colour.from_rgba(1.0, 0.0, 0.0, 0.2)
+          |> result.unwrap(colour.red)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
+  let svg_face =
+    svg.g([], [
+      svg_eye
+        |> svg_translate(-0.3, 0.12),
+      svg_eye
+        |> svg_translate(0.3, 0.12),
+      svg_cheek
+        |> svg_translate(-0.5, -0.1),
+      svg_cheek
+        |> svg_translate(0.5, -0.1),
+    ])
+  svg.g([], [
+    svg.path([
+      attribute.attribute(
+        "d",
+        "M5.0 2.0A4.0 4.0 0 1 0 5.0 7.0 3.0 3.0 0 1 1 5.0 2.0z",
+      ),
+      attribute.attribute("stroke", color),
+      attribute.attribute("stroke-width", "1.0"),
+      attribute.attribute("stroke-linejoin", "round"),
+      attribute.attribute("fill", color),
+    ])
+      |> svg_scale(0.4, 0.4)
+      |> svg_translate(-0.8, -1.6),
+    svg_face |> svg_translate(-1.1, 0.1),
+  ])
 }
 
 fn svg_fog() -> lustre_element.Element(event) {
