@@ -65,7 +65,14 @@ type StateSpecific {
   Menu(lucy_is_hovered: Bool)
 }
 
-const initial_lucy_y_per_second: Float = 2.3
+const initial_running_state_specific: StateSpecific = Running(
+  lucy_angle: 0.0,
+  lucy_x_per_second: -0.67,
+  lucy_y_per_second: 3.75,
+  lucy_x: 2.0,
+  lucy_y: -4.0,
+  lucy_y_maximum: 0.0,
+)
 
 fn init() -> #(State, effect.Effect(Event)) {
   #(
@@ -125,17 +132,7 @@ fn update(
       effect.none(),
     )
     MenuLucyPressed -> #(
-      State(
-        ..state,
-        specific: Running(
-          lucy_angle: 0.0,
-          lucy_x_per_second: 0.0,
-          lucy_y_per_second: initial_lucy_y_per_second,
-          lucy_x: 0.0,
-          lucy_y: 0.0,
-          lucy_y_maximum: 0.0,
-        ),
-      ),
+      State(..state, specific: initial_running_state_specific),
       effect.none(),
     )
     Resized -> #(
@@ -245,14 +242,7 @@ fn update(
           case new_lucy_y <. float.negate(screen_height *. 0.9) {
             True -> #(
               State(
-                specific: Running(
-                  lucy_angle: 0.0,
-                  lucy_y_per_second: initial_lucy_y_per_second,
-                  lucy_y: 0.0,
-                  lucy_x_per_second: 0.0,
-                  lucy_x: 0.0,
-                  lucy_y_maximum: 0.0,
-                ),
+                specific: initial_running_state_specific,
                 window_width: state.window_width,
                 window_height: state.window_height,
                 held_down_left: state.held_down_left,
@@ -380,19 +370,14 @@ fn view(
                   ),
                   attribute.attribute(
                     "y",
-                    screen_height *. 0.84 |> float.to_string,
+                    screen_height *. 0.75 |> float.to_string,
                   ),
                   attribute.attribute("pointer-events", "none"),
                   attribute.style("text-anchor", "middle"),
                   attribute.style("font-weight", "bold"),
-                  attribute.style("font-size", "1px"),
+                  attribute.style("font-size", "1.1px"),
                   attribute.style("font-family", "\"cubano\", monaco, courier"),
-                  attribute.style(
-                    "fill",
-                    colour.from_rgb(0.9, 1.0, 0.86)
-                      |> result.unwrap(colour.black)
-                      |> colour.to_css_rgba_string,
-                  ),
+                  attribute.style("fill", "white"),
                 ],
                 "←/→ or a/d",
               )
@@ -405,8 +390,7 @@ fn view(
                     |> svg_rotate(maths.pi() *. 0.05)
                   False -> svg_lucy(False)
                 }
-                  |> svg_scale(2.0, 2.0),
-
+                  |> svg_scale(1.5, 1.5),
                 svg.circle([
                   lustre_event.on_mouse_enter(MenuLucyHoverStarted),
                   lustre_event.on_mouse_leave(MenuLucyHoverEnded),
@@ -416,7 +400,7 @@ fn view(
                       |> result.unwrap(colour.black)
                       |> colour.to_css_rgba_string,
                   ),
-                  attribute.attribute("r", "2.0"),
+                  attribute.attribute("r", "1.5"),
                 ]),
               ])
                 |> svg_translate(
