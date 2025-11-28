@@ -552,17 +552,6 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
         "fill",
-        colour.from_rgb(0.65, 0.55, 0.0)
-          |> result.unwrap(colour.black)
-          |> colour.to_css_rgba_string,
-      ),
-    ])
-      |> svg_rotate(maths.pi() /. 4.0),
-    svg.rect([
-      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
-      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
-      attribute.style(
-        "fill",
         colour.from_rgb(0.8, 0.72, 0.2)
           |> result.unwrap(colour.black)
           |> colour.to_css_rgba_string,
@@ -581,7 +570,7 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       ),
     ])
       |> svg_rotate(maths.pi() /. 4.0)
-      |> svg_scale(0.33, 1.0),
+      |> svg_scale(0.25, 1.0),
   ])
 }
 
