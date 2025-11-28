@@ -33,20 +33,48 @@ pub fn main() {
           |> svg_translate(x, y)
         }),
     )
+  let svg_cloud = svg_cloud()
   let clouds_svg =
     svg.g(
       [],
       cloud_positions
         |> list.map(fn(position) {
           let #(x, y) = position
-          svg_cloud() |> svg_translate(x, y)
+          svg_cloud |> svg_translate(x, y)
         }),
     )
+  let fog_svg =
+    svg.g(
+      [],
+      // I'd love to add more bug it seems to be extremely taxing to render
+      [
+        #(2.4, -4.4, 1.5),
+        #(2.0, 1.0, 1.0),
+        #(-2.0, 5.0, 0.5),
+        #(4.0, 10.0, 1.2),
+        #(4.6, 14.0, 0.2),
+        #(1.0, 20.0, 0.2),
+        #(-4.0, 24.8, 0.4),
+        #(1.4, 30.0, 0.9),
+        #(1.0, 60.0, 0.9),
+        #(4.6, 84.5, 0.4),
+        #(0.0, 100.0, 0.9),
+      ]
+        |> list.map(fn(position) {
+          let #(x, y, scale) = position
+          svg_fog()
+          |> svg_scale(scale, scale)
+          |> svg_translate(x, y)
+        }),
+    )
+  let environment_svg =
+    svg.g([], [clouds_svg, fog_svg, stars_svg])
+    |> as_static_lustre_component()
   let app =
     lustre.application(
       fn(_: Nil) { init() },
       fn(event, state) { update(cloud_bounce_audio, event, state) },
-      fn(state) { view(state, stars_svg, clouds_svg) },
+      fn(state) { view(state, environment_svg) },
     )
   // I couldn't get "using custom index.html with lustre/dev start" to work
   element.set_attribute(
@@ -333,8 +361,7 @@ const goal_y: Float = 100.0
 
 fn view(
   state: State,
-  stars_svg: lustre_element.Element(_event),
-  clouds_svg: lustre_element.Element(_event),
+  environment_svg: lustre_element.Element(_event),
 ) -> lustre_element.Element(Event) {
   let ration_width_to_height: Float = screen_width /. screen_height
   let #(svg_width, svg_height) = case
@@ -411,6 +438,7 @@ fn view(
               )
                 |> svg_scale(1.0, -1.0),
               svg.g([], [
+                environment_svg,
                 case lucy_is_hovered {
                   True ->
                     svg_lucy(True)
@@ -430,7 +458,6 @@ fn view(
                   ),
                   attribute.attribute("r", "2.0"),
                 ]),
-                clouds_svg,
               ])
                 |> svg_translate(
                   screen_width /. 2.0,
@@ -463,7 +490,7 @@ fn view(
                     |> float.max(0.0)
                     |> float.min(0.7),
                   { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
-                  0.6 -. { progress *. 0.56 },
+                  0.6 -. { progress *. 0.56 } |> float.max(0.095),
                 )
                   |> result.unwrap(colour.black)
                   |> colour.to_css_rgba_string,
@@ -500,8 +527,7 @@ fn view(
                 |> svg_scale(0.5, 0.5)
                 |> svg_rotate(lucy_angle)
                 |> svg_translate(lucy_x, lucy_y),
-              clouds_svg,
-              stars_svg,
+              environment_svg,
             ])
               |> svg_translate(
                 screen_width /. 2.0,
@@ -672,6 +698,23 @@ fn lucy_shape_points() -> List(#(Point, Point)) {
 fn lucy_color() {
   colour.from_rgb(1.0, 0.5, 1.0)
   |> result.unwrap(colour.black)
+}
+
+fn svg_fog() -> lustre_element.Element(event) {
+  // I would love to split these into 2 elements with different opacity
+  // but that slows rendering
+  svg.path([
+    attribute.attribute(
+      "d",
+      "M -6.0,0.0 Q 2.0,1.5 6.0,1.0 Q -2.0,-1.0 -6.0 0.0 M -12.0,-1.0 Q 2.0,0.1 1.0,-0.8 Q -2.0,-1.5 -8.0 -1.2",
+    ),
+    attribute.style(
+      "fill",
+      colour.from_rgba(1.0, 1.0, 1.0, 0.029)
+        |> result.unwrap(colour.white)
+        |> colour.to_css_rgba_string,
+    ),
+  ])
 }
 
 fn svg_cloud() -> lustre_element.Element(event) {
@@ -860,4 +903,20 @@ type Point =
 fn point_scale_by(point: Point, scale: Float) -> Point {
   let #(x, y) = point
   #(x *. scale, y *. scale)
+}
+
+/// to prevent dom diffing.
+fn as_static_lustre_component(
+  node: lustre_element.Element(_event),
+) -> lustre_element.Element(_event) {
+  // This seems extremely stupid honestly.
+  // I also tried using a web component but it didn't render.
+  // Is there a "lazy" lustre primitive that I'm missing?
+  lustre_element.unsafe_raw_html(
+    "http://www.w3.org/2000/svg",
+    "g",
+    [],
+    node |> lustre_element.to_string,
+  )
+  node
 }

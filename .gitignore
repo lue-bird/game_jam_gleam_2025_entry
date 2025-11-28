@@ -3,7 +3,9 @@
 /build
 erl_crash.dump
 manifest.toml
+zombie
 
 #Added automatically by Lustre Dev Tools
 /.lustre
+# TODO should be exposed on release
 /dist
