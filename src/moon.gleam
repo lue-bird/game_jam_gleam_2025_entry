@@ -23,6 +23,41 @@ pub fn main() {
   let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
   // the whole "to avoid recomputing unchanging svgs, pass them from main"
   // thing seems super dumb. Is there something better?
+  let svg_bird = svg_bird()
+  let svg_birds =
+    svg.g(
+      [],
+      [
+        #(4.4, -4.4, 1.5),
+        #(-2.9, -4.3, 1.1),
+        #(2.4, -3.7, 0.5),
+        #(5.4, -3.4, 1.5),
+        #(2.0, 1.0, 1.0),
+        #(5.0, 3.0, 0.5),
+        #(-5.2, 5.0, 0.5),
+        #(4.0, 7.0, 1.2),
+        #(-4.8, 8.0, 1.2),
+        #(4.6, 9.0, 0.3),
+        #(1.0, 11.0, 0.4),
+        #(-4.0, 12.8, 0.4),
+        #(1.4, 14.0, 0.9),
+        #(1.0, 16.0, 0.9),
+        #(4.6, 18.5, 0.4),
+        #(0.0, 20.0, 0.9),
+        #(-4.0, 122.8, 0.4),
+        #(1.4, 24.0, 0.9),
+        #(-4.8, 24.1, 1.0),
+        #(-4.0, 25.6, 0.6),
+        #(1.0, 26.0, 0.9),
+        #(4.9, 30.2, 0.9),
+      ]
+        |> list.map(fn(position) {
+          let #(x, y, scale) = position
+          svg_bird
+          |> svg_scale(scale, scale)
+          |> svg_translate(x, y)
+        }),
+    )
   let stars_svg =
     svg.g(
       [],
@@ -68,15 +103,16 @@ pub fn main() {
           |> svg_translate(x, y)
         }),
     )
-    |> as_static_lustre_component()
   let environment_svg =
     svg.g([], [
       clouds_svg,
       fog_svg,
       stars_svg,
+      svg_birds,
       svg_moon()
         |> svg_translate(0.0, 101.0),
     ])
+    |> as_static_lustre_component()
   let app =
     lustre.application(
       fn(_: Nil) { init() },
@@ -183,8 +219,7 @@ fn update(
           lucy_x_per_second: 0.0,
           lucy_y_per_second: initial_lucy_y_per_second,
           lucy_x: 0.0,
-          lucy_y: 96.0,
-          // TODO 0.0,
+          lucy_y: 0.0,
           lucy_y_maximum: 0.0,
         ),
       ),
@@ -594,6 +629,27 @@ fn svg_small_star() -> lustre_element.Element(_event) {
   ])
 }
 
+fn svg_bird() -> lustre_element.Element(_event) {
+  let color = "white"
+  let wing_radius = 0.2
+  let wing =
+    svg.circle([
+      attribute.attribute("r", wing_radius |> float.to_string),
+      attribute.attribute("fill", "none"),
+      attribute.attribute("stroke", color),
+      attribute.attribute("stroke-width", "0.03"),
+      attribute.attribute("pathLength", "360"),
+      attribute.attribute("stroke-dasharray", "90 270"),
+      attribute.attribute("stroke-linecap", "round"),
+    ])
+  svg.g([], [
+    wing,
+    wing
+      |> svg_scale(-1.0, 1.0)
+      |> svg_translate(wing_radius *. 2.0, 0.0),
+  ])
+}
+
 fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
   let svg_eye = case is_excited {
     True -> lucy_closed_eye()
@@ -615,6 +671,18 @@ fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
           |> result.unwrap(colour.red)
           |> colour.to_css_rgba_string,
       ),
+    ])
+  let svg_mouth =
+    svg.circle([
+      attribute.attribute("cy", "0.0"),
+      attribute.attribute("cx", "0"),
+      attribute.attribute("r", "0.12"),
+      attribute.attribute("fill", "none"),
+      attribute.attribute("stroke", "black"),
+      attribute.attribute("stroke-width", "0.06"),
+      attribute.attribute("pathLength", "360"),
+      attribute.attribute("stroke-dasharray", "0 180 180"),
+      attribute.attribute("stroke-linecap", "round"),
     ])
   svg.g([], [
     svg.path([
@@ -642,17 +710,7 @@ fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
       |> svg_translate(-0.3, -0.08),
     svg_cheek
       |> svg_translate(0.3, -0.08),
-    svg.circle([
-      attribute.attribute("cy", "0.0"),
-      attribute.attribute("cx", "0"),
-      attribute.attribute("r", "0.12"),
-      attribute.attribute("fill", "none"),
-      attribute.attribute("stroke", "black"),
-      attribute.attribute("stroke-width", "0.06"),
-      attribute.attribute("pathLength", "360"),
-      attribute.attribute("stroke-dasharray", "0 180 180"),
-      attribute.attribute("stroke-linecap", "round"),
-    ]),
+    svg_mouth,
   ])
 }
 
@@ -718,10 +776,10 @@ fn svg_moon() {
     |> svg_rotate(maths.pi() /. 2.0)
   let svg_cheek =
     svg.circle([
-      attribute.attribute("r", "0.08"),
+      attribute.attribute("r", "0.1"),
       attribute.attribute(
         "fill",
-        colour.from_rgba(1.0, 0.0, 0.0, 0.2)
+        colour.from_rgba(1.0, 0.2, 0.7, 0.28)
           |> result.unwrap(colour.red)
           |> colour.to_css_rgba_string,
       ),

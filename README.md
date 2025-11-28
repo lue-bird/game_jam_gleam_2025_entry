@@ -15,5 +15,5 @@ gleam run -m lustre/dev start
 - optional: add text and sound for ending
 - optional: add win condition like reaching the moon
 - optional: add animations for most things that have a sound and ending
-- optional: background planets, in maybe birds & trees
+- optional: background planets, in maybe trees
 - no idea how: optimize
