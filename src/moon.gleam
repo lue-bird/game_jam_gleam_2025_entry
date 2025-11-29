@@ -67,9 +67,14 @@ type StateSpecific {
     lucy_x_per_second: Float,
     lucy_y_per_second: Float,
     lucy_y_maximum: Float,
+    previously_collected_diamond: option.Option(AnimatedStart),
     remaining_diamond_positions: List(Point),
   )
   Menu(lucy_is_hovered: Bool)
+}
+
+type AnimatedStart {
+  AnimatedStart(time: Float, position: Point)
 }
 
 const initial_running_state_specific: StateSpecific = Running(
@@ -81,6 +86,7 @@ const initial_running_state_specific: StateSpecific = Running(
   lucy_x: 2.0,
   lucy_y: -4.0,
   lucy_y_maximum: 0.0,
+  previously_collected_diamond: option.None,
   remaining_diamond_positions: all_diamond_positions,
 )
 
@@ -206,6 +212,7 @@ fn update(
           lucy_x_per_second: lucy_x_per_second,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: lucy_y_maximum,
+          previously_collected_diamond: previously_collected_diamond,
           remaining_diamond_positions: remaining_diamond_positions,
           lucy_angle_per_second: lucy_angle_per_second,
         ) -> {
@@ -307,6 +314,28 @@ fn update(
                 }
                 False -> Nil
               }
+              let maybe_collected_diamond =
+                remaining_diamond_positions
+                |> list.find(fn(remaining_diamond_position) {
+                  let #(diamond_x, diamond_y) = remaining_diamond_position
+                  {
+                    float.absolute_value(new_lucy_y -. diamond_y)
+                    <=. diagonal_diamond_size *. 1.55
+                  }
+                  && {
+                    float.absolute_value(new_lucy_x -. diamond_x)
+                    <=. diagonal_diamond_size *. 1.55
+                  }
+                })
+                |> option.from_result
+              let _ = case maybe_collected_diamond {
+                option.None -> Nil
+
+                option.Some(_) -> {
+                  let _ = audio.play(diamond_collect_audio)
+                  Nil
+                }
+              }
               #(
                 State(
                   ..state,
@@ -323,28 +352,22 @@ fn update(
                     lucy_x_per_second: new_lucy_x_per_second,
                     lucy_x: new_lucy_x,
                     lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
-                    remaining_diamond_positions: remaining_diamond_positions
-                      |> list.filter(fn(remaining_diamond_position) {
-                        let #(diamond_x, diamond_y) = remaining_diamond_position
-                        let collected =
-                          {
-                            float.absolute_value(new_lucy_y -. diamond_y)
-                            >. diagonal_diamond_size *. 1.55
-                          }
-                          || {
-                            float.absolute_value(new_lucy_x -. diamond_x)
-                            >. diagonal_diamond_size *. 1.55
-                          }
-                        let _ = case collected {
-                          True -> Nil
-
-                          False -> {
-                            let _ = audio.play(diamond_collect_audio)
-                            Nil
-                          }
-                        }
-                        collected
-                      }),
+                    previously_collected_diamond: case maybe_collected_diamond {
+                      option.None -> previously_collected_diamond
+                      option.Some(collected_diamond) ->
+                        option.Some(AnimatedStart(
+                          time: current_simulation_time,
+                          position: collected_diamond,
+                        ))
+                    },
+                    remaining_diamond_positions: case maybe_collected_diamond {
+                      option.None -> remaining_diamond_positions
+                      option.Some(collected_position) ->
+                        remaining_diamond_positions
+                        |> list.filter(fn(remaining_diamond_position) {
+                          remaining_diamond_position != collected_position
+                        })
+                    },
                   ),
                 ),
                 effect.none(),
@@ -450,7 +473,7 @@ fn view(
                 ],
                 "←/→ or a/d",
               )
-                |> svg_scale(1.0, -1.0),
+                |> svg_scale_xy(1.0, -1.0),
               svg.g([], [
                 svg_environment,
                 case lucy_is_hovered {
@@ -459,7 +482,7 @@ fn view(
                     |> svg_rotate(maths.pi() *. 0.05)
                   False -> svg_lucy(False)
                 }
-                  |> svg_scale(1.5, 1.5),
+                  |> svg_scale_each(1.5),
                 svg.circle([
                   lustre_event.on_mouse_enter(MenuLucyHoverStarted),
                   lustre_event.on_mouse_leave(MenuLucyHoverEnded),
@@ -479,7 +502,7 @@ fn view(
             ],
           )
         Running(
-          previous_simulation_time: previous_simulation_time,
+          previous_simulation_time: maybe_previous_simulation_time,
           lucy_angle: lucy_angle,
           lucy_x: lucy_x,
           lucy_y: lucy_y,
@@ -487,6 +510,7 @@ fn view(
           lucy_x_per_second: _,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: _,
+          previously_collected_diamond: maybe_previously_collected_diamond,
           remaining_diamond_positions: remaining_diamond_positions,
         ) -> {
           let progress: Float =
@@ -499,7 +523,8 @@ fn view(
               {
                 {
                   maths.sin(
-                    { previous_simulation_time |> option.unwrap(0.0) } *. 5.0,
+                    { maybe_previous_simulation_time |> option.unwrap(0.0) }
+                    *. 5.0,
                   )
                 }
                 +. 1.0
@@ -560,12 +585,54 @@ fn view(
               ],
               lucy_y |> float.truncate |> int.to_string <> "m",
             )
-              |> svg_scale(1.0, -1.0),
-
+              |> svg_scale_xy(1.0, -1.0),
             svg.g([], [
               svg_diamonds,
+              case
+                maybe_previously_collected_diamond,
+                maybe_previous_simulation_time
+              {
+                option.None, _ | _, option.None -> lustre_element.none()
+                option.Some(previously_collected_diamond),
+                  option.Some(previous_simulation_time)
+                -> {
+                  let #(x, y) = previously_collected_diamond.position
+                  svg_diamond
+                  |> svg_scale_each(
+                    1.0
+                    -. {
+                      previous_simulation_time
+                      -. previously_collected_diamond.time
+                    },
+                  )
+                  |> svg_translate(
+                    x
+                      -. {
+                      x
+                      *. 0.5
+                      *. {
+                        {
+                          previous_simulation_time
+                          -. previously_collected_diamond.time
+                        }
+                        |> float.min(1.0)
+                      }
+                    },
+                    y
+                      +. 15.0
+                      *. {
+                      float.power(
+                        previous_simulation_time
+                          -. previously_collected_diamond.time,
+                        2.0,
+                      )
+                      |> result.unwrap(1.0)
+                    },
+                  )
+                }
+              },
               svg_lucy(lucy_y_per_second <. -0.8)
-                |> svg_scale(0.5, 0.5)
+                |> svg_scale_each(0.5)
                 |> svg_rotate(lucy_angle)
                 |> svg_translate(lucy_x, lucy_y),
               svg_environment,
@@ -578,7 +645,7 @@ fn view(
           ])
         }
       }
-      |> svg_scale(
+      |> svg_scale_xy(
         svg_width /. screen_width,
         float.negate(svg_height /. screen_height),
       ),
@@ -608,11 +675,11 @@ fn svg_diamond(animation_progress: Float) -> lustre_element.Element(_event) {
     ]),
   ])
   |> svg_translate(0.0, 0.25)
-  |> svg_scale(
+  |> svg_scale_xy(
     0.1 *. 1.38 +. { animation_progress *. 0.007 },
     0.141 *. 1.38 +. { animation_progress *. 0.007 },
   )
-  |> svg_rotate({ -0.5 +. animation_progress } *. 0.1)
+  |> svg_rotate({ -0.5 +. animation_progress } *. 0.17)
 }
 
 fn star_positions() -> List(Point) {
@@ -680,7 +747,7 @@ fn svg_environment() -> lustre_element.Element(_event) {
         |> list.map(fn(position) {
           let #(x, y, scale) = position
           svg_bird
-          |> svg_scale(scale, scale)
+          |> svg_scale_each(scale)
           |> svg_translate(x, y)
         }),
     )
@@ -725,7 +792,7 @@ fn svg_environment() -> lustre_element.Element(_event) {
         |> list.map(fn(position) {
           let #(x, y, scale) = position
           svg_fog
-          |> svg_scale(scale, scale)
+          |> svg_scale_each(scale)
           |> svg_translate(x, y)
         }),
     )
@@ -766,10 +833,10 @@ fn svg_bird() -> lustre_element.Element(_event) {
   svg.g([], [
     wing,
     wing
-      |> svg_scale(-1.0, 1.0)
+      |> svg_scale_xy(-1.0, 1.0)
       |> svg_translate(wing_radius *. 2.0, 0.0),
   ])
-  |> svg_scale(1.49, 1.0)
+  |> svg_scale_xy(1.49, 1.0)
 }
 
 fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
@@ -845,7 +912,7 @@ fn lucy_closed_eye() -> lustre_element.Element(_event) {
     attribute.attribute("stroke-linecap", "round"),
     attribute.attribute("stroke-linejoin", "round"),
   ])
-  |> svg_scale(0.7, 0.7)
+  |> svg_scale_each(0.7)
 }
 
 /// try to make svg_lucy etc depend on it in some form
@@ -928,7 +995,7 @@ fn svg_moon() {
       attribute.attribute("stroke-linejoin", "round"),
       attribute.attribute("fill", color),
     ])
-      |> svg_scale(0.4, 0.4)
+      |> svg_scale_each(0.4)
       |> svg_translate(-0.8, -1.6),
     svg_face |> svg_translate(-1.1, 0.1),
   ])
@@ -984,7 +1051,7 @@ fn svg_cloud() -> lustre_element.Element(event) {
       ]),
     ],
   )
-  |> svg_scale(1.2, 1.2)
+  |> svg_scale_each(1.2)
 }
 
 const cloud_positions: List(Point) = [
@@ -1076,7 +1143,14 @@ const cloud_width: Float = 2.0
 
 const cloud_height: Float = 1.1
 
-fn svg_scale(
+fn svg_scale_each(
+  svg: lustre_element.Element(event),
+  factor: Float,
+) -> lustre_element.Element(event) {
+  svg_scale_xy(svg, factor, factor)
+}
+
+fn svg_scale_xy(
   svg: lustre_element.Element(event),
   x: Float,
   y: Float,
