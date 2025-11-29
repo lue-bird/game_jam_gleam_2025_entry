@@ -17,6 +17,7 @@ import plinth/browser/document
 import plinth/browser/element
 import plinth/browser/event
 import plinth/browser/window
+import plinth/javascript/date
 import plinth/javascript/global
 
 pub fn main() {
@@ -58,6 +59,7 @@ type State {
 
 type StateSpecific {
   Running(
+    previous_simulation_time: option.Option(Float),
     lucy_angle: Float,
     lucy_x: Float,
     lucy_y: Float,
@@ -71,6 +73,7 @@ type StateSpecific {
 }
 
 const initial_running_state_specific: StateSpecific = Running(
+  previous_simulation_time: option.None,
   lucy_angle: 0.0,
   lucy_angle_per_second: -0.5,
   lucy_x_per_second: -0.67,
@@ -196,6 +199,7 @@ fn update(
       case state.specific {
         Menu(_) -> #(state, effect.none())
         Running(
+          previous_simulation_time: maybe_previous_simulation_time,
           lucy_angle: lucy_angle,
           lucy_x: lucy_x,
           lucy_y: lucy_y,
@@ -213,7 +217,17 @@ fn update(
             False, True -> 1.0
             True, True | False, False -> 0.0
           }
-          let seconds_passed = 1.0 /. { 1000 / 60 |> int.to_float }
+          let current_simulation_time =
+            { date.get_time(date.now()) |> int.to_float } /. 1000.0
+          let seconds_passed =
+            case maybe_previous_simulation_time {
+              option.Some(previous_simulation_time) ->
+                current_simulation_time -. previous_simulation_time
+              option.None -> { 1000 / 60 |> int.to_float } /. 1000.0
+            }
+            // this is obviously not correct but makes it easy to adjust
+            // gameplay speed
+            *. 3.5
           let new_lucy_y_per_second =
             lucy_y_per_second -. { 1.0 *. seconds_passed }
             |> float.max(-2.2)
@@ -297,6 +311,9 @@ fn update(
                 State(
                   ..state,
                   specific: Running(
+                    previous_simulation_time: option.Some(
+                      current_simulation_time,
+                    ),
                     lucy_angle: lucy_angle
                       +. { new_lucy_angle_per_second *. seconds_passed },
                     lucy_angle_per_second: new_lucy_angle_per_second,
@@ -462,6 +479,7 @@ fn view(
             ],
           )
         Running(
+          previous_simulation_time: previous_simulation_time,
           lucy_angle: lucy_angle,
           lucy_x: lucy_x,
           lucy_y: lucy_y,
@@ -478,14 +496,16 @@ fn view(
           let diamond_animation_progress =
             // depending on real time would make it much smoother
             float.absolute_value(
-              1.0 -. { lucy_y |> float.modulo(2.0) |> result.unwrap(0.0) },
+              1.0
+              -. {
+                previous_simulation_time
+                |> option.unwrap(lucy_y)
+                |> float.modulo(2.0 /. 3.0)
+                |> result.unwrap(0.0)
+                |> float.multiply(3.0)
+              },
             )
-          let svg_diamond =
-            svg_diamond()
-            |> svg_scale(
-              0.9 +. { diamond_animation_progress *. 0.2 },
-              1.1 -. { diamond_animation_progress *. 0.2 },
-            )
+          let svg_diamond = svg_diamond(diamond_animation_progress)
           let svg_diamonds =
             svg.g(
               [],
@@ -565,56 +585,33 @@ fn view(
   )
 }
 
-const diagonal_diamond_size: Float = 0.45
+const diagonal_diamond_size: Float = 0.42
 
-fn svg_diamond() -> lustre_element.Element(_event) {
+fn svg_diamond(animation_progress: Float) -> lustre_element.Element(_event) {
   svg.g([], [
-    svg.rect([
-      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
-      attribute.attribute("y", diagonal_diamond_size /. -2.0 |> float.to_string),
-      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
-      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
-      attribute.style(
-        "fill",
-        colour.from_rgb(0.8, 0.72, 0.2)
-          |> result.unwrap(colour.black)
-          |> colour.to_css_rgba_string,
-      ),
-    ])
-      |> svg_rotate(maths.pi() /. 4.0)
-      |> svg_scale(0.66, 1.0),
-    svg.rect([
-      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
-      attribute.attribute("y", diagonal_diamond_size /. -2.0 |> float.to_string),
-      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
-      attribute.attribute("height", diagonal_diamond_size |> float.to_string),
-      attribute.style(
-        "fill",
-        colour.from_rgb(1.0, 0.9, 0.6)
-          |> result.unwrap(colour.black)
-          |> colour.to_css_rgba_string,
-      ),
-    ])
-      |> svg_rotate(maths.pi() /. 4.0)
-      |> svg_scale(0.4, 1.0),
-    svg.rect([
-      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
-      attribute.attribute("y", diagonal_diamond_size /. -4.0 |> float.to_string),
-      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
-      attribute.attribute(
-        "height",
-        diagonal_diamond_size /. 2.0 |> float.to_string,
-      ),
-      attribute.style(
-        "fill",
-        colour.from_rgb(1.0, 1.0, 1.0)
-          |> result.unwrap(colour.black)
-          |> colour.to_css_rgba_string,
-      ),
-    ])
-      |> svg_rotate(maths.pi() /. 4.0)
-      |> svg_scale(0.25, 1.0),
+    svg.polygon([
+      attribute.attribute("points", "-2,0 -1,1 0,0"),
+      attribute.style("fill", "#64b5f6"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "-1,1 0,0 1,1"),
+      attribute.style("fill", "#2196f3"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "0,0 1,1 2,0"),
+      attribute.style("fill", "#1976d2"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "-2,0 0,-1.5 2,0"),
+      attribute.style("fill", "#3a8accff"),
+    ]),
   ])
+  |> svg_translate(0.0, 0.25)
+  |> svg_scale(
+    0.1 *. 1.38 +. { animation_progress *. 0.007 },
+    0.141 *. 1.38 +. { animation_progress *. 0.007 },
+  )
+  |> svg_rotate({ -0.5 +. animation_progress } *. 0.1)
 }
 
 fn star_positions() -> List(Point) {
