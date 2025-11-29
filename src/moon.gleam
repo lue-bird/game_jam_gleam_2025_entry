@@ -645,9 +645,7 @@ fn view(
               |> svg_translate(
                 x,
                 y
-                  -. 0.1
-                  +. 0.2
-                  -. 2.0
+                  -. 1.6
                   *. {
                   previous_simulation_time -. previously_bounced_on_cloud.time
                 },
