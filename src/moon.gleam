@@ -496,14 +496,15 @@ fn view(
           let diamond_animation_progress =
             // depending on real time would make it much smoother
             float.absolute_value(
-              1.0
-              -. {
-                previous_simulation_time
-                |> option.unwrap(lucy_y)
-                |> float.modulo(2.0 /. 3.0)
-                |> result.unwrap(0.0)
-                |> float.multiply(3.0)
-              },
+              {
+                {
+                  maths.sin(
+                    { previous_simulation_time |> option.unwrap(0.0) } *. 5.0,
+                  )
+                }
+                +. 1.0
+              }
+              /. 2.0,
             )
           let svg_diamond = svg_diamond(diamond_animation_progress)
           let svg_diamonds =
