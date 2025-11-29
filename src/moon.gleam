@@ -21,6 +21,7 @@ import plinth/javascript/global
 
 pub fn main() {
   let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
+  let diamond_collect_audio = audio.new("diamond-collect-simple.mp3")
   // the whole "to avoid recomputing unchanging svgs, pass them from main"
   // thing seems super dumb. Is there something better?
   let svg_environment =
@@ -29,7 +30,9 @@ pub fn main() {
   let app =
     lustre.application(
       fn(_: Nil) { init() },
-      fn(event, state) { update(cloud_bounce_audio, event, state) },
+      fn(event, state) {
+        update(event, state, cloud_bounce_audio, diamond_collect_audio)
+      },
       fn(state) { view(state, svg_environment) },
     )
   // I couldn't get "using custom index.html with lustre/dev start" to work
@@ -137,9 +140,10 @@ type Event {
 }
 
 fn update(
-  cloud_bounce_audio: audio.Audio,
   state: State,
   event: Event,
+  cloud_bounce_audio: audio.Audio,
+  diamond_collect_audio: audio.Audio,
 ) -> #(State, effect.Effect(Event)) {
   case event {
     MenuLucyHoverStarted -> #(
@@ -287,9 +291,7 @@ fn update(
                   let _ = audio.play(cloud_bounce_audio)
                   Nil
                 }
-                False -> {
-                  Nil
-                }
+                False -> Nil
               }
               #(
                 State(
@@ -307,14 +309,24 @@ fn update(
                     remaining_diamond_positions: remaining_diamond_positions
                       |> list.filter(fn(remaining_diamond_position) {
                         let #(diamond_x, diamond_y) = remaining_diamond_position
-                        {
-                          float.absolute_value(new_lucy_y -. diamond_y)
-                          >. diagonal_diamond_size *. 1.55
+                        let collected =
+                          {
+                            float.absolute_value(new_lucy_y -. diamond_y)
+                            >. diagonal_diamond_size *. 1.55
+                          }
+                          || {
+                            float.absolute_value(new_lucy_x -. diamond_x)
+                            >. diagonal_diamond_size *. 1.55
+                          }
+                        let _ = case collected {
+                          True -> Nil
+
+                          False -> {
+                            let _ = audio.play(diamond_collect_audio)
+                            Nil
+                          }
                         }
-                        || {
-                          float.absolute_value(new_lucy_x -. diamond_x)
-                          >. diagonal_diamond_size *. 1.55
-                        }
+                        collected
                       }),
                   ),
                 ),
