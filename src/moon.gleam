@@ -768,7 +768,7 @@ fn svg_bird() -> lustre_element.Element(_event) {
       |> svg_scale(-1.0, 1.0)
       |> svg_translate(wing_radius *. 2.0, 0.0),
   ])
-  |> svg_scale(1.6, 1.0)
+  |> svg_scale(1.49, 1.0)
 }
 
 fn svg_lucy(is_excited: Bool) -> lustre_element.Element(event) {
