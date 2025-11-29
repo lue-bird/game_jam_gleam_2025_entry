@@ -67,6 +67,7 @@ type StateSpecific {
     lucy_x_per_second: Float,
     lucy_y_per_second: Float,
     lucy_y_maximum: Float,
+    previously_bounced_on_cloud: option.Option(AnimatedStart),
     previously_collected_diamond: option.Option(AnimatedStart),
     remaining_diamond_positions: List(Point),
   )
@@ -86,6 +87,7 @@ const initial_running_state_specific: StateSpecific = Running(
   lucy_x: 2.0,
   lucy_y: -4.0,
   lucy_y_maximum: 0.0,
+  previously_bounced_on_cloud: option.None,
   previously_collected_diamond: option.None,
   remaining_diamond_positions: all_diamond_positions,
 )
@@ -212,7 +214,8 @@ fn update(
           lucy_x_per_second: lucy_x_per_second,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: lucy_y_maximum,
-          previously_collected_diamond: previously_collected_diamond,
+          previously_bounced_on_cloud: maybe_previously_bounced_on_cloud,
+          previously_collected_diamond: maybe_previously_collected_diamond,
           remaining_diamond_positions: remaining_diamond_positions,
           lucy_angle_per_second: lucy_angle_per_second,
         ) -> {
@@ -271,23 +274,29 @@ fn update(
                 False -> new_lucy_x_not_wrapped
               }
           }
-          let lucy_falls_on_cloud: Bool =
-            new_lucy_y_per_second <. 0.0
-            && cloud_positions
-            |> list.any(fn(cloud_position) {
-              let #(cloud_x, cloud_y) = cloud_position
-              {
-                float.absolute_value(new_lucy_y -. cloud_y)
-                <=. { cloud_height /. 2.0 }
-              }
-              && {
-                float.absolute_value(new_lucy_x -. cloud_x)
-                <=. { cloud_width /. 2.0 }
-              }
-            })
+          let lucy_falls_on_cloud: option.Option(Point) = case
+            new_lucy_y_per_second >. 0.0
+          {
+            True -> option.None
+            False -> {
+              cloud_positions
+              |> list.find(fn(cloud_position) {
+                let #(cloud_x, cloud_y) = cloud_position
+                {
+                  float.absolute_value(new_lucy_y -. cloud_y)
+                  <=. { cloud_height /. 2.0 }
+                }
+                && {
+                  float.absolute_value(new_lucy_x -. cloud_x)
+                  <=. { cloud_width /. 2.0 }
+                }
+              })
+              |> option.from_result
+            }
+          }
           let new_lucy_y_per_second = case lucy_falls_on_cloud {
-            True -> 2.6
-            False -> new_lucy_y_per_second
+            option.Some(_) -> 2.59
+            option.None -> new_lucy_y_per_second
           }
           let new_lucy_angle_per_second = case effective_held_x_direction {
             0.0 -> lucy_angle_per_second
@@ -307,12 +316,12 @@ fn update(
             )
             False -> {
               let _ = case lucy_falls_on_cloud {
-                True -> {
+                option.Some(_) -> {
                   // monotone, consider variating pitch and adjusting volume
                   let _ = audio.play(cloud_bounce_audio)
                   Nil
                 }
-                False -> Nil
+                option.None -> Nil
               }
               let maybe_collected_diamond =
                 remaining_diamond_positions
@@ -352,8 +361,16 @@ fn update(
                     lucy_x_per_second: new_lucy_x_per_second,
                     lucy_x: new_lucy_x,
                     lucy_y_maximum: lucy_y_maximum |> float.max(new_lucy_y),
+                    previously_bounced_on_cloud: case lucy_falls_on_cloud {
+                      option.None -> maybe_previously_bounced_on_cloud
+                      option.Some(bounced_on_cloud) ->
+                        option.Some(AnimatedStart(
+                          time: current_simulation_time,
+                          position: bounced_on_cloud,
+                        ))
+                    },
                     previously_collected_diamond: case maybe_collected_diamond {
-                      option.None -> previously_collected_diamond
+                      option.None -> maybe_previously_collected_diamond
                       option.Some(collected_diamond) ->
                         option.Some(AnimatedStart(
                           time: current_simulation_time,
@@ -510,6 +527,7 @@ fn view(
           lucy_x_per_second: _,
           lucy_y_per_second: lucy_y_per_second,
           lucy_y_maximum: _,
+          previously_bounced_on_cloud: maybe_previously_bounced_on_cloud,
           previously_collected_diamond: maybe_previously_collected_diamond,
           remaining_diamond_positions: remaining_diamond_positions,
         ) -> {
@@ -541,6 +559,101 @@ fn view(
                   svg_diamond |> svg_translate(x, y)
                 }),
             )
+          let svg_previously_collected_diamond_animation = case
+            maybe_previously_collected_diamond,
+            maybe_previous_simulation_time
+          {
+            option.None, _ | _, option.None -> lustre_element.none()
+            option.Some(previously_collected_diamond),
+              option.Some(previous_simulation_time)
+            -> {
+              let #(x, y) = previously_collected_diamond.position
+              svg_diamond
+              |> svg_scale_each(
+                1.0
+                -. {
+                  previous_simulation_time -. previously_collected_diamond.time
+                },
+              )
+              |> svg_translate(
+                x
+                  -. {
+                  x
+                  *. 0.5
+                  *. {
+                    {
+                      previous_simulation_time
+                      -. previously_collected_diamond.time
+                    }
+                    |> float.min(1.0)
+                  }
+                },
+                y
+                  +. 15.0
+                  *. {
+                  float.power(
+                    previous_simulation_time
+                      -. previously_collected_diamond.time,
+                    2.0,
+                  )
+                  |> result.unwrap(1.0)
+                },
+              )
+            }
+          }
+          let svg_previously_bounced_on_cloud_animation = case
+            maybe_previously_bounced_on_cloud,
+            maybe_previous_simulation_time
+          {
+            option.None, _ | _, option.None -> lustre_element.none()
+            option.Some(previously_bounced_on_cloud),
+              option.Some(previous_simulation_time)
+            -> {
+              let #(x, y) = previously_bounced_on_cloud.position
+              svg.g(
+                [
+                  attribute.attribute(
+                    "opacity",
+                    0.29
+                    -. {
+                      0.7
+                      *. {
+                        previous_simulation_time
+                        -. previously_bounced_on_cloud.time
+                      }
+                    }
+                      |> float.max(0.0)
+                      |> float.to_string,
+                  ),
+                ],
+                [svg_cloud()],
+              )
+              |> svg_scale_xy(
+                1.0
+                  +. 1.1
+                  *. {
+                  previous_simulation_time -. previously_bounced_on_cloud.time
+                },
+                {
+                  1.4
+                  -. {
+                    previous_simulation_time -. previously_bounced_on_cloud.time
+                  }
+                }
+                  |> float.max(0.0),
+              )
+              |> svg_translate(
+                x,
+                y
+                  -. 0.1
+                  +. 0.2
+                  -. 2.0
+                  *. {
+                  previous_simulation_time -. previously_bounced_on_cloud.time
+                },
+              )
+            }
+          }
           svg.g([], [
             svg.rect([
               attribute.attribute("x", "0"),
@@ -586,51 +699,11 @@ fn view(
               lucy_y |> float.truncate |> int.to_string <> "m",
             )
               |> svg_scale_xy(1.0, -1.0),
+
             svg.g([], [
               svg_diamonds,
-              case
-                maybe_previously_collected_diamond,
-                maybe_previous_simulation_time
-              {
-                option.None, _ | _, option.None -> lustre_element.none()
-                option.Some(previously_collected_diamond),
-                  option.Some(previous_simulation_time)
-                -> {
-                  let #(x, y) = previously_collected_diamond.position
-                  svg_diamond
-                  |> svg_scale_each(
-                    1.0
-                    -. {
-                      previous_simulation_time
-                      -. previously_collected_diamond.time
-                    },
-                  )
-                  |> svg_translate(
-                    x
-                      -. {
-                      x
-                      *. 0.5
-                      *. {
-                        {
-                          previous_simulation_time
-                          -. previously_collected_diamond.time
-                        }
-                        |> float.min(1.0)
-                      }
-                    },
-                    y
-                      +. 15.0
-                      *. {
-                      float.power(
-                        previous_simulation_time
-                          -. previously_collected_diamond.time,
-                        2.0,
-                      )
-                      |> result.unwrap(1.0)
-                    },
-                  )
-                }
-              },
+              svg_previously_collected_diamond_animation,
+              svg_previously_bounced_on_cloud_animation,
               svg_lucy(lucy_y_per_second <. -0.8)
                 |> svg_scale_each(0.5)
                 |> svg_rotate(lucy_angle)
@@ -1018,15 +1091,16 @@ fn svg_fog() -> lustre_element.Element(event) {
   ])
 }
 
+fn cloud_color() {
+  colour.from_rgb(0.9, 1.0, 0.86)
+  |> result.unwrap(colour.black)
+  |> colour.to_css_rgba_string
+}
+
 fn svg_cloud() -> lustre_element.Element(event) {
   svg.g(
     [
-      attribute.style(
-        "fill",
-        colour.from_rgb(0.9, 1.0, 0.86)
-          |> result.unwrap(colour.black)
-          |> colour.to_css_rgba_string,
-      ),
+      attribute.style("fill", cloud_color()),
     ],
     [
       svg.circle([
