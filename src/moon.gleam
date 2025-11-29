@@ -475,7 +475,17 @@ fn view(
             lucy_y *. { 1.0 /. goal_y }
             |> float.max(0.0)
             |> float.min(1.0)
-          let svg_diamond = svg_diamond()
+          let diamond_animation_progress =
+            // depending on real time would make it much smoother
+            float.absolute_value(
+              1.0 -. { lucy_y |> float.modulo(2.0) |> result.unwrap(0.0) },
+            )
+          let svg_diamond =
+            svg_diamond()
+            |> svg_scale(
+              0.9 +. { diamond_animation_progress *. 0.2 },
+              1.1 -. { diamond_animation_progress *. 0.2 },
+            )
           let svg_diamonds =
             svg.g(
               [],
@@ -560,6 +570,8 @@ const diagonal_diamond_size: Float = 0.45
 fn svg_diamond() -> lustre_element.Element(_event) {
   svg.g([], [
     svg.rect([
+      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
+      attribute.attribute("y", diagonal_diamond_size /. -2.0 |> float.to_string),
       attribute.attribute("width", diagonal_diamond_size |> float.to_string),
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
@@ -572,11 +584,30 @@ fn svg_diamond() -> lustre_element.Element(_event) {
       |> svg_rotate(maths.pi() /. 4.0)
       |> svg_scale(0.66, 1.0),
     svg.rect([
+      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
+      attribute.attribute("y", diagonal_diamond_size /. -2.0 |> float.to_string),
       attribute.attribute("width", diagonal_diamond_size |> float.to_string),
       attribute.attribute("height", diagonal_diamond_size |> float.to_string),
       attribute.style(
         "fill",
         colour.from_rgb(1.0, 0.9, 0.6)
+          |> result.unwrap(colour.black)
+          |> colour.to_css_rgba_string,
+      ),
+    ])
+      |> svg_rotate(maths.pi() /. 4.0)
+      |> svg_scale(0.4, 1.0),
+    svg.rect([
+      attribute.attribute("x", diagonal_diamond_size /. -2.0 |> float.to_string),
+      attribute.attribute("y", diagonal_diamond_size /. -4.0 |> float.to_string),
+      attribute.attribute("width", diagonal_diamond_size |> float.to_string),
+      attribute.attribute(
+        "height",
+        diagonal_diamond_size /. 2.0 |> float.to_string,
+      ),
+      attribute.style(
+        "fill",
+        colour.from_rgb(1.0, 1.0, 1.0)
           |> result.unwrap(colour.black)
           |> colour.to_css_rgba_string,
       ),
