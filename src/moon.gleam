@@ -654,6 +654,32 @@ fn view(
               )
             }
           }
+          let svg_summary_of_collected_diamonds = {
+            let all_diamonds_count = all_diamond_positions |> list.length
+            let remaining_diamonds_count =
+              remaining_diamond_positions |> list.length
+            let collected_diamonds_count =
+              all_diamonds_count - remaining_diamonds_count
+            list.range(0, all_diamonds_count - 1)
+            |> list.map(fn(diamond_index) {
+              let diamond_percentage =
+                { diamond_index |> int.to_float }
+                /. { { all_diamonds_count |> int.to_float } -. 1.0 }
+              case diamond_index < collected_diamonds_count {
+                True -> svg_diamond
+                False ->
+                  svg.g([attribute.style("filter", "grayscale(100%)")], [
+                    svg_diamond,
+                  ])
+              }
+              |> svg_translate(
+                // I cannot explain this to you or me, sorry
+                -0.2 +. 3.0 *. maths.cos(maths.pi() *. diamond_percentage),
+                102.0 +. 3.0 *. maths.sin(maths.pi() *. diamond_percentage),
+              )
+            })
+            |> svg.g([], _)
+          }
           svg.g([], [
             svg.rect([
               attribute.attribute("x", "0"),
@@ -701,6 +727,7 @@ fn view(
               |> svg_scale_xy(1.0, -1.0),
 
             svg.g([], [
+              svg_summary_of_collected_diamonds,
               svg_diamonds,
               svg_previously_collected_diamond_animation,
               svg_previously_bounced_on_cloud_animation,
