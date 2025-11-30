@@ -21,3 +21,4 @@ All assets and code made in jam time
   - rendering svgs in the browser is not all that fast
   - turns out lustre/dev was the program that used up more than 2GB of memory
   - I need to learn how to make non-cringe music
+  - chrome and firefox render stroke-dasharray in combination with pathLength differently

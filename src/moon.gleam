@@ -935,7 +935,7 @@ fn svg_bird() -> lustre_element.Element(_event) {
       attribute.attribute("fill", "none"),
       attribute.attribute("stroke", color),
       attribute.attribute("stroke-width", "0.03"),
-      attribute.attribute("pathLength", "360"),
+      attribute.attribute("pathLength", "320"),
       attribute.attribute("stroke-dasharray", "90 270"),
       attribute.attribute("stroke-linecap", "round"),
     ])
