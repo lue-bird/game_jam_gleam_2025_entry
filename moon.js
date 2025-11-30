@@ -6394,7 +6394,7 @@ function svg_environment() {
 }
 var cloud_width = 2;
 var cloud_height = 1.1;
-function update2(state, event4, cloud_bounce_audio, diamond_collect_audio) {
+function update2(state, event4, music_audio, cloud_bounce_audio, diamond_collect_audio) {
   if (event4 instanceof Resized) {
     return [
       new State(state.specific, (() => {
@@ -6571,10 +6571,11 @@ function update2(state, event4, cloud_bounce_audio, diamond_collect_audio) {
     }
   } else if (event4 instanceof KeyPressed) {
     let key2 = event4[0];
-    let $ = key_as_x_direction(key2);
-    if ($ instanceof Some) {
-      let $1 = $[0];
-      if ($1 instanceof Left) {
+    let $ = play(music_audio);
+    let $1 = key_as_x_direction(key2);
+    if ($1 instanceof Some) {
+      let $2 = $1[0];
+      if ($2 instanceof Left) {
         return [
           new State(state.specific, state.window_width, state.window_height, true, state.held_down_right, state.lucy_y_highscore),
           none()
@@ -6618,6 +6619,7 @@ function update2(state, event4, cloud_bounce_audio, diamond_collect_audio) {
       none()
     ];
   } else {
+    let $ = play(music_audio);
     return [
       new State(initial_running_state_specific, state.window_width, state.window_height, state.held_down_left, state.held_down_right, state.lucy_y_highscore),
       none()
@@ -6627,6 +6629,7 @@ function update2(state, event4, cloud_bounce_audio, diamond_collect_audio) {
 function main() {
   let cloud_bounce_audio = newAudio("cloud-bounce.mp3");
   let diamond_collect_audio = newAudio("diamond-collect-simple.mp3");
+  let music_audio = newAudio("music.mp3");
   let _block;
   let _pipe = svg_environment();
   _block = as_static_lustre_component(_pipe);
@@ -6634,19 +6637,19 @@ function main() {
   let app = application((_) => {
     return init();
   }, (event4, state) => {
-    return update2(event4, state, cloud_bounce_audio, diamond_collect_audio);
+    return update2(event4, state, music_audio, cloud_bounce_audio, diamond_collect_audio);
   }, (state) => {
     return view(state, svg_environment$1);
   });
   setAttribute2(body(), "style", "margin: 0; background: black");
   let $ = start3(app, "#app", undefined);
   if (!($ instanceof Ok)) {
-    throw makeError("let_assert", FILEPATH2, "moon", 45, "main", "Pattern match failed, no pattern matched the value.", {
+    throw makeError("let_assert", FILEPATH2, "moon", 52, "main", "Pattern match failed, no pattern matched the value.", {
       value: $,
-      start: 1303,
-      end: 1352,
-      pattern_start: 1314,
-      pattern_end: 1319
+      start: 1420,
+      end: 1469,
+      pattern_start: 1431,
+      pattern_end: 1436
     });
   }
   return;
