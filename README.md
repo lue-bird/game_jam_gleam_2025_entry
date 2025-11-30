@@ -7,6 +7,8 @@ gleam run -m lustre/dev start
 ```
 All assets and code made during the jam
 
+![game screenshot](./moon-screenshot.png)
+
 -------
 
 ### development: consider
