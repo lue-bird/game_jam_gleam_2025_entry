@@ -23,6 +23,7 @@ import plinth/javascript/global
 pub fn main() {
   let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
   let diamond_collect_audio = audio.new("diamond-collect-simple.mp3")
+  let music_audio = audio.new("music.mp3")
   // the whole "to avoid recomputing unchanging svgs, pass them from main"
   // thing seems super dumb. Is there something better?
   let svg_environment =
@@ -32,7 +33,13 @@ pub fn main() {
     lustre.application(
       fn(_: Nil) { init() },
       fn(event, state) {
-        update(event, state, cloud_bounce_audio, diamond_collect_audio)
+        update(
+          event,
+          state,
+          music_audio,
+          cloud_bounce_audio,
+          diamond_collect_audio,
+        )
       },
       fn(state) { view(state, svg_environment) },
     )
@@ -153,6 +160,7 @@ type Event {
 fn update(
   state: State,
   event: Event,
+  music_audio: audio.Audio,
   cloud_bounce_audio: audio.Audio,
   diamond_collect_audio: audio.Audio,
 ) -> #(State, effect.Effect(Event)) {
@@ -165,10 +173,10 @@ fn update(
       State(..state, specific: Menu(lucy_is_hovered: False)),
       effect.none(),
     )
-    MenuLucyPressed -> #(
-      State(..state, specific: initial_running_state_specific),
-      effect.none(),
-    )
+    MenuLucyPressed -> {
+      let _ = audio.play(music_audio)
+      #(State(..state, specific: initial_running_state_specific), effect.none())
+    }
     Resized -> #(
       State(
         ..state,
@@ -178,6 +186,9 @@ fn update(
       effect.none(),
     )
     KeyPressed(key) -> {
+      // I don't have time to hook up js FFI to make the audio repeat
+      // so: just try to restart it on any user input
+      let _ = audio.play(music_audio)
       case key_as_x_direction(key) {
         option.None -> #(state, effect.none())
         option.Some(Left) -> #(
