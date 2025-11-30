@@ -24,11 +24,11 @@ pub fn main() {
   let cloud_bounce_audio = audio.new("cloud-bounce.mp3")
   let diamond_collect_audio = audio.new("diamond-collect-simple.mp3")
   let music_audio = audio.new("music.mp3")
-  // the whole "to avoid recomputing unchanging svgs, pass them from main"
-  // thing seems super dumb. Is there something better?
   let svg_environment =
     svg_environment()
     |> as_static_lustre_component()
+  // the whole "to avoid recomputing unchanging svgs, pass them from main"
+  // thing seems super dumb. Is there something better?
   let app =
     lustre.application(
       fn(_: Nil) { init() },
