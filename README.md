@@ -10,7 +10,6 @@ All assets and code made during the jam
 -------
 
 ### development: consider
-- add intro "cinematic" of lucy falling out of the sky
 - background planets, shooting stars (higher up), and maybe trees at the bottom
 - no idea how: optimize
 

@@ -65,6 +65,8 @@ type State {
 }
 
 type StateSpecific {
+  Menu(lucy_is_hovered: Bool)
+  IntroCinematic(start_time: Float, current_time: Float)
   Running(
     previous_simulation_time: option.Option(Float),
     lucy_angle: Float,
@@ -78,7 +80,6 @@ type StateSpecific {
     previously_collected_diamond: option.Option(AnimatedStart),
     remaining_diamond_positions: List(Point),
   )
-  Menu(lucy_is_hovered: Bool)
 }
 
 type AnimatedStart {
@@ -175,7 +176,17 @@ fn update(
     )
     MenuLucyPressed -> {
       let _ = audio.play(music_audio)
-      #(State(..state, specific: initial_running_state_specific), effect.none())
+      let current_time = { date.get_time(date.now()) |> int.to_float } /. 1000.0
+      #(
+        State(
+          ..state,
+          specific: IntroCinematic(
+            start_time: current_time,
+            current_time: current_time,
+          ),
+        ),
+        effect.none(),
+      )
     }
     Resized -> #(
       State(
@@ -217,6 +228,21 @@ fn update(
     SimulationTickPassed -> {
       case state.specific {
         Menu(_) -> #(state, effect.none())
+        IntroCinematic(start_time: start_time, current_time: _) -> {
+          let current_time =
+            { date.get_time(date.now()) |> int.to_float } /. 1000.0
+          #(
+            State(..state, specific: case current_time -. start_time >=. 9.0 {
+              True -> initial_running_state_specific
+              False ->
+                IntroCinematic(
+                  start_time: start_time,
+                  current_time: current_time,
+                )
+            }),
+            effect.none(),
+          )
+        }
         Running(
           previous_simulation_time: maybe_previous_simulation_time,
           lucy_angle: lucy_angle,
@@ -528,6 +554,48 @@ fn view(
                 ),
             ],
           )
+        IntroCinematic(start_time: start_time, current_time: current_time) -> {
+          let time_passed = current_time -. start_time
+          let lucy_y =
+            95.0
+            -. time_passed
+            *. 3.0
+            -. {
+              time_passed
+              |> float.power(1.7)
+              |> result.unwrap(1.0)
+            }
+            *. 2.0
+          let lucy_x = time_passed *. 0.235
+          svg.g([], [
+            svg.rect([
+              attribute.attribute("y", "-100%"),
+              attribute.attribute("width", "100%"),
+              attribute.attribute("height", "100%"),
+              attribute.attribute(
+                "fill",
+                background_color(lucy_y)
+                  |> colour.to_css_rgba_string,
+              ),
+            ]),
+            svg.g([], [
+              svg_lucy(True)
+                |> svg_rotate(
+                  maths.pi()
+                  *. -0.5
+                  *. { time_passed *. { 1.3 +. 0.08 *. time_passed } },
+                )
+                |> svg_scale_each(0.5)
+                |> svg_translate(lucy_x, lucy_y),
+              svg_environment,
+            ])
+              |> svg_translate(
+                screen_width /. 2.0,
+                float.negate(screen_height *. 0.56)
+                  -. { lucy_y |> float.max(0.0) },
+              ),
+          ])
+        }
         Running(
           previous_simulation_time: maybe_previous_simulation_time,
           lucy_angle: lucy_angle,
@@ -541,10 +609,6 @@ fn view(
           previously_collected_diamond: maybe_previously_collected_diamond,
           remaining_diamond_positions: remaining_diamond_positions,
         ) -> {
-          let progress: Float =
-            lucy_y *. { 1.0 /. goal_y }
-            |> float.max(0.0)
-            |> float.min(1.0)
           let diamond_animation_progress =
             // depending on real time would make it much smoother
             float.absolute_value(
@@ -693,14 +757,7 @@ fn view(
               attribute.attribute("height", "100%"),
               attribute.attribute(
                 "fill",
-                colour.from_rgb(
-                  lucy_y *. { -1.0 /. screen_height }
-                    |> float.max(0.0)
-                    |> float.min(0.7),
-                  { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
-                  0.6 -. { progress *. 0.56 } |> float.max(0.095),
-                )
-                  |> result.unwrap(colour.black)
+                background_color(lucy_y)
                   |> colour.to_css_rgba_string,
               ),
             ]),
@@ -756,6 +813,21 @@ fn view(
       ),
     ],
   )
+}
+
+fn background_color(lucy_y: Float) {
+  let progress: Float =
+    lucy_y *. { 1.0 /. goal_y }
+    |> float.max(0.0)
+    |> float.min(1.0)
+  colour.from_rgb(
+    lucy_y *. { -1.0 /. screen_height }
+      |> float.max(0.0)
+      |> float.min(0.7),
+    { 0.45 -. { progress *. 0.6 } } |> float.max(0.0),
+    0.6 -. { progress *. 0.56 } |> float.max(0.095),
+  )
+  |> result.unwrap(colour.black)
 }
 
 const diagonal_diamond_size: Float = 0.42
