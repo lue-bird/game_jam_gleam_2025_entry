@@ -5399,6 +5399,21 @@ class State extends CustomType {
   }
 }
 
+class Menu extends CustomType {
+  constructor(lucy_is_hovered) {
+    super();
+    this.lucy_is_hovered = lucy_is_hovered;
+  }
+}
+
+class IntroCinematic extends CustomType {
+  constructor(start_time, current_time) {
+    super();
+    this.start_time = start_time;
+    this.current_time = current_time;
+  }
+}
+
 class Running2 extends CustomType {
   constructor(previous_simulation_time, lucy_angle, lucy_x, lucy_y, lucy_angle_per_second, lucy_x_per_second, lucy_y_per_second, lucy_y_maximum, previously_bounced_on_cloud, previously_collected_diamond, remaining_diamond_positions) {
     super();
@@ -5413,13 +5428,6 @@ class Running2 extends CustomType {
     this.previously_bounced_on_cloud = previously_bounced_on_cloud;
     this.previously_collected_diamond = previously_collected_diamond;
     this.remaining_diamond_positions = remaining_diamond_positions;
-  }
-}
-
-class Menu extends CustomType {
-  constructor(lucy_is_hovered) {
-    super();
-    this.lucy_is_hovered = lucy_is_hovered;
   }
 }
 
@@ -5906,6 +5914,25 @@ var initial_running_state_specific = /* @__PURE__ */ new Running2(/* @__PURE__ *
 var screen_width = 16;
 var screen_height = 9;
 var goal_y = 100;
+function background_color(lucy_y) {
+  let _block;
+  let _pipe = lucy_y * divideFloat(1, goal_y);
+  let _pipe$1 = max(_pipe, 0);
+  _block = min(_pipe$1, 1);
+  let progress = _block;
+  let _pipe$2 = from_rgb((() => {
+    let _pipe$22 = lucy_y * divideFloat(-1, screen_height);
+    let _pipe$3 = max(_pipe$22, 0);
+    return min(_pipe$3, 0.7);
+  })(), (() => {
+    let _pipe$22 = 0.45 - progress * 0.6;
+    return max(_pipe$22, 0);
+  })(), (() => {
+    let _pipe$22 = 0.6 - progress * 0.56;
+    return max(_pipe$22, 0.095);
+  })());
+  return unwrap2(_pipe$2, black);
+}
 function view(state, svg_environment) {
   let ration_width_to_height = divideFloat(screen_width, screen_height);
   let _block;
@@ -5945,189 +5972,7 @@ function view(state, svg_environment) {
     (() => {
       let _block$1;
       let $2 = state.specific;
-      if ($2 instanceof Running2) {
-        let maybe_previous_simulation_time = $2.previous_simulation_time;
-        let lucy_angle = $2.lucy_angle;
-        let lucy_x = $2.lucy_x;
-        let lucy_y = $2.lucy_y;
-        let lucy_y_per_second = $2.lucy_y_per_second;
-        let maybe_previously_bounced_on_cloud = $2.previously_bounced_on_cloud;
-        let maybe_previously_collected_diamond = $2.previously_collected_diamond;
-        let remaining_diamond_positions = $2.remaining_diamond_positions;
-        let _block$2;
-        let _pipe2 = lucy_y * divideFloat(1, goal_y);
-        let _pipe$1 = max(_pipe2, 0);
-        _block$2 = min(_pipe$1, 1);
-        let progress = _block$2;
-        let diamond_animation_progress = absolute_value((sin2((() => {
-          let _pipe$2 = maybe_previous_simulation_time;
-          return unwrap(_pipe$2, 0);
-        })() * 5) + 1) / 2);
-        let svg_diamond_grey$1 = svg_diamond_grey(diamond_animation_progress);
-        let svg_diamond$1 = svg_diamond(diamond_animation_progress);
-        let svg_diamonds = g(toList([]), (() => {
-          let _pipe$2 = remaining_diamond_positions;
-          return map(_pipe$2, (remaining_diamond_position) => {
-            let x;
-            let y;
-            x = remaining_diamond_position[0];
-            y = remaining_diamond_position[1];
-            let _pipe$3 = svg_diamond$1;
-            return svg_translate(_pipe$3, x, y);
-          });
-        })());
-        let _block$3;
-        if (maybe_previously_collected_diamond instanceof Some && maybe_previous_simulation_time instanceof Some) {
-          let previously_collected_diamond = maybe_previously_collected_diamond[0];
-          let previous_simulation_time = maybe_previous_simulation_time[0];
-          let $3 = previously_collected_diamond.position;
-          let x;
-          let y;
-          x = $3[0];
-          y = $3[1];
-          let _pipe$2 = svg_diamond$1;
-          let _pipe$3 = svg_scale_each(_pipe$2, 1 - (previous_simulation_time - previously_collected_diamond.time));
-          _block$3 = svg_translate(_pipe$3, x - x * 0.5 * (() => {
-            let _pipe$4 = previous_simulation_time - previously_collected_diamond.time;
-            return min(_pipe$4, 1);
-          })(), y + 15 * (() => {
-            let _pipe$4 = power2(previous_simulation_time - previously_collected_diamond.time, 2);
-            return unwrap2(_pipe$4, 1);
-          })());
-        } else {
-          _block$3 = none2();
-        }
-        let svg_previously_collected_diamond_animation = _block$3;
-        let _block$4;
-        if (maybe_previously_bounced_on_cloud instanceof Some && maybe_previous_simulation_time instanceof Some) {
-          let previously_bounced_on_cloud = maybe_previously_bounced_on_cloud[0];
-          let previous_simulation_time = maybe_previous_simulation_time[0];
-          let $3 = previously_bounced_on_cloud.position;
-          let x;
-          let y;
-          x = $3[0];
-          y = $3[1];
-          let _pipe$2 = g(toList([
-            attribute2("opacity", (() => {
-              let _pipe$22 = 0.29 - 0.7 * (previous_simulation_time - previously_bounced_on_cloud.time);
-              let _pipe$32 = max(_pipe$22, 0);
-              return float_to_string(_pipe$32);
-            })())
-          ]), toList([svg_cloud()]));
-          let _pipe$3 = svg_scale_xy(_pipe$2, 1 + 1.1 * (previous_simulation_time - previously_bounced_on_cloud.time), (() => {
-            let _pipe$32 = 1.4 - (previous_simulation_time - previously_bounced_on_cloud.time);
-            return max(_pipe$32, 0);
-          })());
-          _block$4 = svg_translate(_pipe$3, x, y - 1.6 * (previous_simulation_time - previously_bounced_on_cloud.time));
-        } else {
-          _block$4 = none2();
-        }
-        let svg_previously_bounced_on_cloud_animation = _block$4;
-        let _block$5;
-        {
-          let _block$6;
-          let _pipe$2 = all_diamond_positions;
-          _block$6 = length(_pipe$2);
-          let all_diamonds_count = _block$6;
-          let _block$7;
-          let _pipe$3 = remaining_diamond_positions;
-          _block$7 = length(_pipe$3);
-          let remaining_diamonds_count = _block$7;
-          let collected_diamonds_count = all_diamonds_count - remaining_diamonds_count;
-          let _pipe$4 = range(0, all_diamonds_count - 1);
-          let _pipe$5 = map(_pipe$4, (diamond_index) => {
-            let diamond_percentage = divideFloat((() => {
-              let _pipe$53 = diamond_index;
-              return identity(_pipe$53);
-            })(), (() => {
-              let _pipe$53 = all_diamonds_count;
-              return identity(_pipe$53);
-            })() - 1);
-            let _block$8;
-            let $3 = diamond_index < collected_diamonds_count;
-            if ($3) {
-              _block$8 = svg_diamond$1;
-            } else {
-              _block$8 = svg_diamond_grey$1;
-            }
-            let _pipe$52 = _block$8;
-            return svg_translate(_pipe$52, -0.2 + 3 * cos2(pi2() * diamond_percentage), 102 + 3 * sin2(pi2() * diamond_percentage));
-          });
-          _block$5 = ((_capture) => {
-            return g(toList([]), _capture);
-          })(_pipe$5);
-        }
-        let svg_summary_of_collected_diamonds = _block$5;
-        _block$1 = g(toList([]), toList([
-          rect(toList([
-            attribute2("y", "-100%"),
-            attribute2("width", "100%"),
-            attribute2("height", "100%"),
-            attribute2("fill", (() => {
-              let _pipe$2 = from_rgb((() => {
-                let _pipe$22 = lucy_y * divideFloat(-1, screen_height);
-                let _pipe$32 = max(_pipe$22, 0);
-                return min(_pipe$32, 0.7);
-              })(), (() => {
-                let _pipe$22 = 0.45 - progress * 0.6;
-                return max(_pipe$22, 0);
-              })(), (() => {
-                let _pipe$22 = 0.6 - progress * 0.56;
-                return max(_pipe$22, 0.095);
-              })());
-              let _pipe$3 = unwrap2(_pipe$2, black);
-              return to_css_rgba_string(_pipe$3);
-            })())
-          ])),
-          (() => {
-            let _pipe$2 = text3(toList([
-              attribute2("x", (() => {
-                let _pipe$22 = screen_width / 2;
-                return float_to_string(_pipe$22);
-              })()),
-              attribute2("y", (() => {
-                let _pipe$22 = screen_height * 0.95;
-                return float_to_string(_pipe$22);
-              })()),
-              attribute2("pointer-events", "none"),
-              style("text-anchor", "middle"),
-              style("font-weight", "bold"),
-              style("font-size", "1px"),
-              style("font-family", '"cubano", monaco, courier'),
-              style("text-shadow", "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black, -2px 2px black, -1.8px 1.8px black, -1.6px 1.6px black, -1.5px 1.5px black, -1px 1px black, -3px 3px black, -2px 2px black, -1px 1px black"),
-              style("fill", (() => {
-                let _pipe$22 = from_rgb(0.9, 1, 0.86);
-                let _pipe$3 = unwrap2(_pipe$22, black);
-                return to_css_rgba_string(_pipe$3);
-              })())
-            ]), (() => {
-              let _pipe$22 = lucy_y;
-              let _pipe$3 = truncate(_pipe$22);
-              return to_string(_pipe$3);
-            })() + "m");
-            return svg_scale_xy(_pipe$2, 1, -1);
-          })(),
-          (() => {
-            let _pipe$2 = g(toList([]), toList([
-              svg_summary_of_collected_diamonds,
-              svg_diamonds,
-              svg_previously_collected_diamond_animation,
-              svg_previously_bounced_on_cloud_animation,
-              (() => {
-                let _pipe$22 = svg_lucy(lucy_y_per_second < -0.8);
-                let _pipe$3 = svg_scale_each(_pipe$22, 0.5);
-                let _pipe$4 = svg_rotate(_pipe$3, lucy_angle);
-                return svg_translate(_pipe$4, lucy_x, lucy_y);
-              })(),
-              svg_environment
-            ]));
-            return svg_translate(_pipe$2, screen_width / 2, negate(screen_height * 0.56) - (() => {
-              let _pipe$3 = lucy_y;
-              return max(_pipe$3, 0);
-            })());
-          })()
-        ]));
-      } else {
+      if ($2 instanceof Menu) {
         let lucy_is_hovered = $2.lucy_is_hovered;
         _block$1 = g(toList([on_mouse_down(new MenuLucyPressed)]), toList([
           rect(toList([
@@ -6185,6 +6030,208 @@ function view(state, svg_environment) {
               ]))
             ]));
             return svg_translate(_pipe2, screen_width / 2, negate(screen_height * 0.5));
+          })()
+        ]));
+      } else if ($2 instanceof IntroCinematic) {
+        let start_time = $2.start_time;
+        let current_time = $2.current_time;
+        let time_passed = current_time - start_time;
+        let lucy_y = 95 - time_passed * 3 - (() => {
+          let _pipe2 = time_passed;
+          let _pipe$1 = power2(_pipe2, 1.7);
+          return unwrap2(_pipe$1, 1);
+        })() * 2;
+        let lucy_x = time_passed * 0.235;
+        _block$1 = g(toList([]), toList([
+          rect(toList([
+            attribute2("y", "-100%"),
+            attribute2("width", "100%"),
+            attribute2("height", "100%"),
+            attribute2("fill", (() => {
+              let _pipe2 = background_color(lucy_y);
+              return to_css_rgba_string(_pipe2);
+            })())
+          ])),
+          (() => {
+            let _pipe2 = g(toList([]), toList([
+              (() => {
+                let _pipe3 = svg_lucy(true);
+                let _pipe$1 = svg_rotate(_pipe3, pi2() * -0.5 * (time_passed * (1.3 + 0.08 * time_passed)));
+                let _pipe$2 = svg_scale_each(_pipe$1, 0.5);
+                return svg_translate(_pipe$2, lucy_x, lucy_y);
+              })(),
+              svg_environment
+            ]));
+            return svg_translate(_pipe2, screen_width / 2, negate(screen_height * 0.56) - (() => {
+              let _pipe$1 = lucy_y;
+              return max(_pipe$1, 0);
+            })());
+          })()
+        ]));
+      } else {
+        let maybe_previous_simulation_time = $2.previous_simulation_time;
+        let lucy_angle = $2.lucy_angle;
+        let lucy_x = $2.lucy_x;
+        let lucy_y = $2.lucy_y;
+        let lucy_y_per_second = $2.lucy_y_per_second;
+        let maybe_previously_bounced_on_cloud = $2.previously_bounced_on_cloud;
+        let maybe_previously_collected_diamond = $2.previously_collected_diamond;
+        let remaining_diamond_positions = $2.remaining_diamond_positions;
+        let diamond_animation_progress = absolute_value((sin2((() => {
+          let _pipe2 = maybe_previous_simulation_time;
+          return unwrap(_pipe2, 0);
+        })() * 5) + 1) / 2);
+        let svg_diamond_grey$1 = svg_diamond_grey(diamond_animation_progress);
+        let svg_diamond$1 = svg_diamond(diamond_animation_progress);
+        let svg_diamonds = g(toList([]), (() => {
+          let _pipe2 = remaining_diamond_positions;
+          return map(_pipe2, (remaining_diamond_position) => {
+            let x;
+            let y;
+            x = remaining_diamond_position[0];
+            y = remaining_diamond_position[1];
+            let _pipe$1 = svg_diamond$1;
+            return svg_translate(_pipe$1, x, y);
+          });
+        })());
+        let _block$2;
+        if (maybe_previously_collected_diamond instanceof Some && maybe_previous_simulation_time instanceof Some) {
+          let previously_collected_diamond = maybe_previously_collected_diamond[0];
+          let previous_simulation_time = maybe_previous_simulation_time[0];
+          let $3 = previously_collected_diamond.position;
+          let x;
+          let y;
+          x = $3[0];
+          y = $3[1];
+          let _pipe2 = svg_diamond$1;
+          let _pipe$1 = svg_scale_each(_pipe2, 1 - (previous_simulation_time - previously_collected_diamond.time));
+          _block$2 = svg_translate(_pipe$1, x - x * 0.5 * (() => {
+            let _pipe$2 = previous_simulation_time - previously_collected_diamond.time;
+            return min(_pipe$2, 1);
+          })(), y + 15 * (() => {
+            let _pipe$2 = power2(previous_simulation_time - previously_collected_diamond.time, 2);
+            return unwrap2(_pipe$2, 1);
+          })());
+        } else {
+          _block$2 = none2();
+        }
+        let svg_previously_collected_diamond_animation = _block$2;
+        let _block$3;
+        if (maybe_previously_bounced_on_cloud instanceof Some && maybe_previous_simulation_time instanceof Some) {
+          let previously_bounced_on_cloud = maybe_previously_bounced_on_cloud[0];
+          let previous_simulation_time = maybe_previous_simulation_time[0];
+          let $3 = previously_bounced_on_cloud.position;
+          let x;
+          let y;
+          x = $3[0];
+          y = $3[1];
+          let _pipe2 = g(toList([
+            attribute2("opacity", (() => {
+              let _pipe3 = 0.29 - 0.7 * (previous_simulation_time - previously_bounced_on_cloud.time);
+              let _pipe$12 = max(_pipe3, 0);
+              return float_to_string(_pipe$12);
+            })())
+          ]), toList([svg_cloud()]));
+          let _pipe$1 = svg_scale_xy(_pipe2, 1 + 1.1 * (previous_simulation_time - previously_bounced_on_cloud.time), (() => {
+            let _pipe$12 = 1.4 - (previous_simulation_time - previously_bounced_on_cloud.time);
+            return max(_pipe$12, 0);
+          })());
+          _block$3 = svg_translate(_pipe$1, x, y - 1.6 * (previous_simulation_time - previously_bounced_on_cloud.time));
+        } else {
+          _block$3 = none2();
+        }
+        let svg_previously_bounced_on_cloud_animation = _block$3;
+        let _block$4;
+        {
+          let _block$5;
+          let _pipe2 = all_diamond_positions;
+          _block$5 = length(_pipe2);
+          let all_diamonds_count = _block$5;
+          let _block$6;
+          let _pipe$1 = remaining_diamond_positions;
+          _block$6 = length(_pipe$1);
+          let remaining_diamonds_count = _block$6;
+          let collected_diamonds_count = all_diamonds_count - remaining_diamonds_count;
+          let _pipe$2 = range(0, all_diamonds_count - 1);
+          let _pipe$3 = map(_pipe$2, (diamond_index) => {
+            let diamond_percentage = divideFloat((() => {
+              let _pipe$33 = diamond_index;
+              return identity(_pipe$33);
+            })(), (() => {
+              let _pipe$33 = all_diamonds_count;
+              return identity(_pipe$33);
+            })() - 1);
+            let _block$7;
+            let $3 = diamond_index < collected_diamonds_count;
+            if ($3) {
+              _block$7 = svg_diamond$1;
+            } else {
+              _block$7 = svg_diamond_grey$1;
+            }
+            let _pipe$32 = _block$7;
+            return svg_translate(_pipe$32, -0.2 + 3 * cos2(pi2() * diamond_percentage), 102 + 3 * sin2(pi2() * diamond_percentage));
+          });
+          _block$4 = ((_capture) => {
+            return g(toList([]), _capture);
+          })(_pipe$3);
+        }
+        let svg_summary_of_collected_diamonds = _block$4;
+        _block$1 = g(toList([]), toList([
+          rect(toList([
+            attribute2("y", "-100%"),
+            attribute2("width", "100%"),
+            attribute2("height", "100%"),
+            attribute2("fill", (() => {
+              let _pipe2 = background_color(lucy_y);
+              return to_css_rgba_string(_pipe2);
+            })())
+          ])),
+          (() => {
+            let _pipe2 = text3(toList([
+              attribute2("x", (() => {
+                let _pipe3 = screen_width / 2;
+                return float_to_string(_pipe3);
+              })()),
+              attribute2("y", (() => {
+                let _pipe3 = screen_height * 0.95;
+                return float_to_string(_pipe3);
+              })()),
+              attribute2("pointer-events", "none"),
+              style("text-anchor", "middle"),
+              style("font-weight", "bold"),
+              style("font-size", "1px"),
+              style("font-family", '"cubano", monaco, courier'),
+              style("text-shadow", "-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black, -2px 2px black, -1.8px 1.8px black, -1.6px 1.6px black, -1.5px 1.5px black, -1px 1px black, -3px 3px black, -2px 2px black, -1px 1px black"),
+              style("fill", (() => {
+                let _pipe3 = from_rgb(0.9, 1, 0.86);
+                let _pipe$1 = unwrap2(_pipe3, black);
+                return to_css_rgba_string(_pipe$1);
+              })())
+            ]), (() => {
+              let _pipe3 = lucy_y;
+              let _pipe$1 = truncate(_pipe3);
+              return to_string(_pipe$1);
+            })() + "m");
+            return svg_scale_xy(_pipe2, 1, -1);
+          })(),
+          (() => {
+            let _pipe2 = g(toList([]), toList([
+              svg_summary_of_collected_diamonds,
+              svg_diamonds,
+              svg_previously_collected_diamond_animation,
+              svg_previously_bounced_on_cloud_animation,
+              (() => {
+                let _pipe3 = svg_lucy(lucy_y_per_second < -0.8);
+                let _pipe$1 = svg_scale_each(_pipe3, 0.5);
+                let _pipe$2 = svg_rotate(_pipe$1, lucy_angle);
+                return svg_translate(_pipe$2, lucy_x, lucy_y);
+              })(),
+              svg_environment
+            ]));
+            return svg_translate(_pipe2, screen_width / 2, negate(screen_height * 0.56) - (() => {
+              let _pipe$1 = lucy_y;
+              return max(_pipe$1, 0);
+            })());
           })()
         ]));
       }
@@ -6439,7 +6486,26 @@ function update2(state, event4, music_audio, cloud_bounce_audio, diamond_collect
     ];
   } else if (event4 instanceof SimulationTickPassed) {
     let $ = state.specific;
-    if ($ instanceof Running2) {
+    if ($ instanceof Menu) {
+      return [state, none()];
+    } else if ($ instanceof IntroCinematic) {
+      let start_time = $.start_time;
+      let current_time = (() => {
+        let _pipe = getTime(now());
+        return identity(_pipe);
+      })() / 1000;
+      return [
+        new State((() => {
+          let $1 = current_time - start_time >= 9;
+          if ($1) {
+            return initial_running_state_specific;
+          } else {
+            return new IntroCinematic(start_time, current_time);
+          }
+        })(), state.window_width, state.window_height, state.held_down_left, state.held_down_right, state.lucy_y_highscore),
+        none()
+      ];
+    } else {
       let maybe_previous_simulation_time = $.previous_simulation_time;
       let lucy_angle = $.lucy_angle;
       let lucy_x = $.lucy_x;
@@ -6597,8 +6663,6 @@ function update2(state, event4, music_audio, cloud_bounce_audio, diamond_collect
           none()
         ];
       }
-    } else {
-      return [state, none()];
     }
   } else if (event4 instanceof KeyPressed) {
     let key2 = event4[0];
@@ -6651,8 +6715,12 @@ function update2(state, event4, music_audio, cloud_bounce_audio, diamond_collect
     ];
   } else {
     let $ = play(music_audio);
+    let current_time = (() => {
+      let _pipe = getTime(now());
+      return identity(_pipe);
+    })() / 1000;
     return [
-      new State(initial_running_state_specific, state.window_width, state.window_height, state.held_down_left, state.held_down_right, state.lucy_y_highscore),
+      new State(new IntroCinematic(current_time, current_time), state.window_width, state.window_height, state.held_down_left, state.held_down_right, state.lucy_y_highscore),
       none()
     ];
   }
