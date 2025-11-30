@@ -471,7 +471,6 @@ fn view(
             ],
             [
               svg.rect([
-                attribute.attribute("x", "0"),
                 attribute.attribute("y", "-100%"),
                 attribute.attribute("width", "100%"),
                 attribute.attribute("height", "100%"),
@@ -560,6 +559,7 @@ fn view(
               }
               /. 2.0,
             )
+          let svg_diamond_grey = svg_diamond_grey(diamond_animation_progress)
           let svg_diamond = svg_diamond(diamond_animation_progress)
           let svg_diamonds =
             svg.g(
@@ -676,10 +676,7 @@ fn view(
                 /. { { all_diamonds_count |> int.to_float } -. 1.0 }
               case diamond_index < collected_diamonds_count {
                 True -> svg_diamond
-                False ->
-                  svg.g([attribute.style("filter", "grayscale(100%)")], [
-                    svg_diamond,
-                  ])
+                False -> svg_diamond_grey
               }
               |> svg_translate(
                 // I cannot explain this to you or me, sorry
@@ -691,7 +688,6 @@ fn view(
           }
           svg.g([], [
             svg.rect([
-              attribute.attribute("x", "0"),
               attribute.attribute("y", "-100%"),
               attribute.attribute("width", "100%"),
               attribute.attribute("height", "100%"),
@@ -768,19 +764,46 @@ fn svg_diamond(animation_progress: Float) -> lustre_element.Element(_event) {
   svg.g([], [
     svg.polygon([
       attribute.attribute("points", "-2,0 -1,1 0,0"),
-      attribute.style("fill", "#64b5f6"),
+      attribute.attribute("fill", "#64b5f6"),
     ]),
     svg.polygon([
       attribute.attribute("points", "-1,1 0,0 1,1"),
-      attribute.style("fill", "#2196f3"),
+      attribute.attribute("fill", "#2196f3"),
     ]),
     svg.polygon([
       attribute.attribute("points", "0,0 1,1 2,0"),
-      attribute.style("fill", "#1976d2"),
+      attribute.attribute("fill", "#1976d2"),
     ]),
     svg.polygon([
       attribute.attribute("points", "-2,0 0,-1.5 2,0"),
-      attribute.style("fill", "#3a8accff"),
+      attribute.attribute("fill", "#3a8accff"),
+    ]),
+  ])
+  |> svg_translate(0.0, 0.25)
+  |> svg_scale_xy(
+    0.1 *. 1.38 +. { animation_progress *. 0.007 },
+    0.141 *. 1.38 +. { animation_progress *. 0.007 },
+  )
+  |> svg_rotate({ -0.5 +. animation_progress } *. 0.17)
+}
+
+fn svg_diamond_grey(animation_progress: Float) -> lustre_element.Element(_event) {
+  svg.g([], [
+    svg.polygon([
+      attribute.attribute("points", "-2,0 -1,1 0,0"),
+      attribute.attribute("fill", "#b3b3b3ff"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "-1,1 0,0 1,1"),
+      attribute.attribute("fill", "#9c9c9cff"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "0,0 1,1 2,0"),
+      attribute.attribute("fill", "#888888ff"),
+    ]),
+    svg.polygon([
+      attribute.attribute("points", "-2,0 0,-1.5 2,0"),
+      attribute.attribute("fill", "#9b9b9bff"),
     ]),
   ])
   |> svg_translate(0.0, 0.25)
@@ -1118,7 +1141,7 @@ fn svg_fog() -> lustre_element.Element(event) {
       "d",
       "M -6.0,0.0 Q 2.0,1.5 6.0,1.0 Q -2.0,-1.0 -6.0 0.0 M -12.0,-1.0 Q 2.0,0.1 1.0,-0.8 Q -2.0,-1.5 -8.0 -1.2",
     ),
-    attribute.style(
+    attribute.attribute(
       "fill",
       colour.from_rgba(1.0, 1.0, 1.0, 0.029)
         |> result.unwrap(colour.white)
@@ -1134,33 +1157,32 @@ fn cloud_color() {
 }
 
 fn svg_cloud() -> lustre_element.Element(event) {
-  svg.g(
-    [
-      attribute.style("fill", cloud_color()),
-    ],
-    [
-      svg.circle([
-        attribute.attribute("cy", "0.12"),
-        attribute.attribute("cx", "-0.27"),
-        attribute.attribute("r", "0.25"),
-      ]),
-      svg.circle([
-        attribute.attribute("cy", "0.12"),
-        attribute.attribute("cx", "0.12"),
-        attribute.attribute("r", "0.3"),
-      ]),
-      svg.circle([
-        attribute.attribute("cy", "-0.17"),
-        attribute.attribute("cx", "0.3"),
-        attribute.attribute("r", "0.21"),
-      ]),
-      svg.circle([
-        attribute.attribute("cy", "0"),
-        attribute.attribute("cx", "0.5"),
-        attribute.attribute("r", "0.15"),
-      ]),
-    ],
-  )
+  let color = cloud_color()
+  svg.g([], [
+    svg.circle([
+      attribute.attribute("fill", color),
+      attribute.attribute("cy", "0.12"),
+      attribute.attribute("cx", "-0.27"),
+      attribute.attribute("r", "0.25"),
+    ]),
+    svg.circle([
+      attribute.attribute("fill", color),
+      attribute.attribute("cy", "0.12"),
+      attribute.attribute("cx", "0.12"),
+      attribute.attribute("r", "0.3"),
+    ]),
+    svg.circle([
+      attribute.attribute("fill", color),
+      attribute.attribute("cy", "-0.17"),
+      attribute.attribute("cx", "0.3"),
+      attribute.attribute("r", "0.21"),
+    ]),
+    svg.circle([
+      attribute.attribute("fill", color),
+      attribute.attribute("cx", "0.5"),
+      attribute.attribute("r", "0.15"),
+    ]),
+  ])
   |> svg_scale_each(1.2)
 }
 
@@ -1257,7 +1279,15 @@ fn svg_scale_each(
   svg: lustre_element.Element(event),
   factor: Float,
 ) -> lustre_element.Element(event) {
-  svg_scale_xy(svg, factor, factor)
+  svg.g(
+    [
+      attribute.attribute(
+        "transform",
+        "scale(" <> { factor |> float.to_string } <> ")",
+      ),
+    ],
+    [svg],
+  )
 }
 
 fn svg_scale_xy(
@@ -1327,9 +1357,7 @@ fn point_scale_by(point: Point, scale: Float) -> Point {
 fn as_static_lustre_component(
   node: lustre_element.Element(_event),
 ) -> lustre_element.Element(_event) {
-  // This seems extremely stupid honestly.
-  // I also tried using a web component but it didn't render.
-  // Is there a "lazy" lustre primitive that I'm missing?
+  // ↓ is not really noticeably faster :(
   lustre_element.unsafe_raw_html(
     "http://www.w3.org/2000/svg",
     "g",
@@ -1337,4 +1365,6 @@ fn as_static_lustre_component(
     node |> lustre_element.to_string,
   )
   node
+  // I also tried using a web component but it didn't render.
+  // Is there a lustre primitive that I'm missing?
 }
