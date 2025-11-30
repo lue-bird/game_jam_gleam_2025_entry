@@ -5526,7 +5526,7 @@ function lucy_color() {
 function svg_fog() {
   return path(toList([
     attribute2("d", "M -6.0,0.0 Q 2.0,1.5 6.0,1.0 Q -2.0,-1.0 -6.0 0.0 M -12.0,-1.0 Q 2.0,0.1 1.0,-0.8 Q -2.0,-1.5 -8.0 -1.2"),
-    style("fill", (() => {
+    attribute2("fill", (() => {
       let _pipe = from_rgba(1, 1, 1, 0.029);
       let _pipe$1 = unwrap2(_pipe, white);
       return to_css_rgba_string(_pipe$1);
@@ -5538,19 +5538,13 @@ function cloud_color() {
   let _pipe$1 = unwrap2(_pipe, black);
   return to_css_rgba_string(_pipe$1);
 }
-function svg_scale_xy(svg2, x, y) {
+function svg_scale_each(svg2, factor) {
   return g(toList([
     attribute2("transform", "scale(" + (() => {
-      let _pipe = x;
-      return float_to_string(_pipe);
-    })() + ", " + (() => {
-      let _pipe = y;
+      let _pipe = factor;
       return float_to_string(_pipe);
     })() + ")")
   ]), toList([svg2]));
-}
-function svg_scale_each(svg2, factor) {
-  return svg_scale_xy(svg2, factor, factor);
 }
 function lucy_closed_eye() {
   let _pipe = polyline(toList([
@@ -5564,29 +5558,44 @@ function lucy_closed_eye() {
   return svg_scale_each(_pipe, 0.7);
 }
 function svg_cloud() {
-  let _pipe = g(toList([style("fill", cloud_color())]), toList([
+  let color = cloud_color();
+  let _pipe = g(toList([]), toList([
     circle(toList([
+      attribute2("fill", color),
       attribute2("cy", "0.12"),
       attribute2("cx", "-0.27"),
       attribute2("r", "0.25")
     ])),
     circle(toList([
+      attribute2("fill", color),
       attribute2("cy", "0.12"),
       attribute2("cx", "0.12"),
       attribute2("r", "0.3")
     ])),
     circle(toList([
+      attribute2("fill", color),
       attribute2("cy", "-0.17"),
       attribute2("cx", "0.3"),
       attribute2("r", "0.21")
     ])),
     circle(toList([
-      attribute2("cy", "0"),
+      attribute2("fill", color),
       attribute2("cx", "0.5"),
       attribute2("r", "0.15")
     ]))
   ]));
   return svg_scale_each(_pipe, 1.2);
+}
+function svg_scale_xy(svg2, x, y) {
+  return g(toList([
+    attribute2("transform", "scale(" + (() => {
+      let _pipe = x;
+      return float_to_string(_pipe);
+    })() + ", " + (() => {
+      let _pipe = y;
+      return float_to_string(_pipe);
+    })() + ")")
+  ]), toList([svg2]));
 }
 function svg_translate(svg2, x, y) {
   return g(toList([
@@ -5614,7 +5623,7 @@ function svg_bird() {
     attribute2("fill", "none"),
     attribute2("stroke", color),
     attribute2("stroke-width", "0.03"),
-    attribute2("pathLength", "360"),
+    attribute2("pathLength", "320"),
     attribute2("stroke-dasharray", "90 270"),
     attribute2("stroke-linecap", "round")
   ]));
@@ -5640,19 +5649,42 @@ function svg_diamond(animation_progress) {
   let _pipe = g(toList([]), toList([
     polygon(toList([
       attribute2("points", "-2,0 -1,1 0,0"),
-      style("fill", "#64b5f6")
+      attribute2("fill", "#64b5f6")
     ])),
     polygon(toList([
       attribute2("points", "-1,1 0,0 1,1"),
-      style("fill", "#2196f3")
+      attribute2("fill", "#2196f3")
     ])),
     polygon(toList([
       attribute2("points", "0,0 1,1 2,0"),
-      style("fill", "#1976d2")
+      attribute2("fill", "#1976d2")
     ])),
     polygon(toList([
       attribute2("points", "-2,0 0,-1.5 2,0"),
-      style("fill", "#3a8accff")
+      attribute2("fill", "#3a8accff")
+    ]))
+  ]));
+  let _pipe$1 = svg_translate(_pipe, 0, 0.25);
+  let _pipe$2 = svg_scale_xy(_pipe$1, 0.1 * 1.38 + animation_progress * 0.007, 0.141 * 1.38 + animation_progress * 0.007);
+  return svg_rotate(_pipe$2, (-0.5 + animation_progress) * 0.17);
+}
+function svg_diamond_grey(animation_progress) {
+  let _pipe = g(toList([]), toList([
+    polygon(toList([
+      attribute2("points", "-2,0 -1,1 0,0"),
+      attribute2("fill", "#b3b3b3ff")
+    ])),
+    polygon(toList([
+      attribute2("points", "-1,1 0,0 1,1"),
+      attribute2("fill", "#9c9c9cff")
+    ])),
+    polygon(toList([
+      attribute2("points", "0,0 1,1 2,0"),
+      attribute2("fill", "#888888ff")
+    ])),
+    polygon(toList([
+      attribute2("points", "-2,0 0,-1.5 2,0"),
+      attribute2("fill", "#9b9b9bff")
     ]))
   ]));
   let _pipe$1 = svg_translate(_pipe, 0, 0.25);
@@ -5931,6 +5963,7 @@ function view(state, svg_environment) {
           let _pipe$2 = maybe_previous_simulation_time;
           return unwrap(_pipe$2, 0);
         })() * 5) + 1) / 2);
+        let svg_diamond_grey$1 = svg_diamond_grey(diamond_animation_progress);
         let svg_diamond$1 = svg_diamond(diamond_animation_progress);
         let svg_diamonds = g(toList([]), (() => {
           let _pipe$2 = remaining_diamond_positions;
@@ -6015,7 +6048,7 @@ function view(state, svg_environment) {
             if ($3) {
               _block$8 = svg_diamond$1;
             } else {
-              _block$8 = g(toList([style("filter", "grayscale(100%)")]), toList([svg_diamond$1]));
+              _block$8 = svg_diamond_grey$1;
             }
             let _pipe$52 = _block$8;
             return svg_translate(_pipe$52, -0.2 + 3 * cos2(pi2() * diamond_percentage), 102 + 3 * sin2(pi2() * diamond_percentage));
@@ -6027,7 +6060,6 @@ function view(state, svg_environment) {
         let svg_summary_of_collected_diamonds = _block$5;
         _block$1 = g(toList([]), toList([
           rect(toList([
-            attribute2("x", "0"),
             attribute2("y", "-100%"),
             attribute2("width", "100%"),
             attribute2("height", "100%"),
@@ -6099,7 +6131,6 @@ function view(state, svg_environment) {
         let lucy_is_hovered = $2.lucy_is_hovered;
         _block$1 = g(toList([on_mouse_down(new MenuLucyPressed)]), toList([
           rect(toList([
-            attribute2("x", "0"),
             attribute2("y", "-100%"),
             attribute2("width", "100%"),
             attribute2("height", "100%"),
