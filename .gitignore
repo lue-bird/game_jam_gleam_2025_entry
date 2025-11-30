@@ -4,8 +4,9 @@
 erl_crash.dump
 manifest.toml
 zombie
+node_modules
+pnpm-lock.yaml
 
 #Added automatically by Lustre Dev Tools
 /.lustre
-# TODO should be exposed on release
 /dist

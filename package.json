@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  },
+  "homepage": "https://lue-bird.github.io/game_jam_gleam_2025_entry/",
+  "scripts": {
+    "predeploy": "cp favicon.ico dist/ && gleam run -m lustre/dev build && cp index.html dist/",
+    "deploy": "gh-pages -d dist"
+  }
+}
